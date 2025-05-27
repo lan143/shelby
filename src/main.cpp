@@ -89,4 +89,5 @@ void loop()
     discoveryMgr.loop();
     ArduinoOTA.handle();
     gates.loop();
+    stateMgr.loop();
 }

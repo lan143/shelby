@@ -21,9 +21,12 @@ public:
         publishState();
     }
 
+    void loop();
+
 private:
     GatesState _gatesState = GATES_STATE_CLOSED;
     GatesState _doorState = GATES_STATE_CLOSED;
+    unsigned int _lastUpdateStateTime = 0;
 
 private:
     State buildState();

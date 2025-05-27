@@ -1,8 +1,12 @@
 #include <enum/device_class.h>
+#include "defines.h"
 #include "gates.h"
 
 void Gates::init(EDHA::Device* device, std::string stateTopic, std::string commandTopic)
 {
+    pinMode(GATE_OPEN, INPUT);
+    pinMode(GATE_CLOSE, INPUT);
+
     _discoveryMgr->addCover(
         device,
         "Gates",
@@ -48,11 +52,17 @@ void Gates::gatesChange(GatesCommand command)
 
     _state = GATES_RELAY_STATE_GATE_ON;
 
-    if (_gatesState != GATES_STATE_OPENING && _gatesState != GATES_STATE_CLOSING) {
-        _stateChangeTime = millis() + 30000;
+    switch (command) {
+        case GATES_COMMAND_OPEN:
+            gatesStateUpdate(GATES_STATE_OPENING);
+            break;
+        case GATES_COMMAND_CLOSE:
+            gatesStateUpdate(GATES_STATE_CLOSING);
+            break;
+        case GATES_COMMAND_STOP:
+            gatesStateUpdate(GATES_STATE_OPENED);
+            break;
     }
-
-    gatesStateUpdate();
 }
 
 void Gates::doorChange(GatesCommand command)
@@ -71,11 +81,17 @@ void Gates::doorChange(GatesCommand command)
 
     _state = GATES_RELAY_STATE_DOOR_ON;
 
-    if (_doorState != GATES_STATE_OPENING && _doorState != GATES_STATE_CLOSING) {
-        _stateChangeTime = millis() + 30000;
+    switch (command) {
+        case GATES_COMMAND_OPEN:
+            doorStateUpdate(GATES_STATE_OPENING);
+            break;
+        case GATES_COMMAND_CLOSE:
+            doorStateUpdate(GATES_STATE_CLOSING);
+            break;
+        case GATES_COMMAND_STOP:
+            doorStateUpdate(GATES_STATE_OPENED);
+            break;
     }
-
-    doorStateUpdate();
 }
 
 void Gates::loop()
@@ -103,42 +119,52 @@ void Gates::loop()
         _lastRelayStateUpdateTime = millis();
     }
 
-    if (_stateChangeTime != 0 && _stateChangeTime < millis()) {
-        if (_gatesState != GATES_STATE_CLOSED) {
-            gatesStateUpdate();
-        } else if (_doorState != GATES_STATE_CLOSED) {
-            doorStateUpdate();
+    if ((_lastMotorUpdateTime + 500) < millis()) {
+        if (isMotorOpening()) {
+            if (_gatesState == GATES_STATE_CLOSED
+                && _doorState == GATES_STATE_CLOSED) {
+                    gatesStateUpdate(GATES_STATE_OPENING);
+            }
+
+            _isMotorOpening = true;
+        } else if (_isMotorOpening) {
+            if (_gatesState == GATES_STATE_OPENING) {
+                gatesStateUpdate(GATES_STATE_OPENED);
+            } else if (_doorState == GATES_STATE_OPENING) {
+                doorStateUpdate(GATES_STATE_OPENED);
+            }
+
+            _isMotorOpening = false;
         }
 
-        _stateChangeTime = 0;
+        if (isMotorClosing()) {
+            if (_gatesState == GATES_STATE_OPENED) {
+                gatesStateUpdate(GATES_STATE_CLOSING);
+            } else if (_doorState == GATES_STATE_OPENED) {
+                doorStateUpdate(GATES_STATE_CLOSING);
+            }
+
+            _isMotorClosing = true;
+        } else if (_isMotorClosing) {
+            gatesStateUpdate(GATES_STATE_CLOSED);
+            doorStateUpdate(GATES_STATE_CLOSED);
+
+            _isMotorClosing = false;
+        }
+
+        _lastMotorUpdateTime = millis();
     }
 }
 
-GatesState Gates::getUpdatedGatesState(GatesState oldState)
+void Gates::gatesStateUpdate(GatesState newState)
 {
-    switch (oldState) {
-        case GATES_STATE_CLOSED:
-            return GATES_STATE_OPENING;
-        case GATES_STATE_OPENING:
-            return GATES_STATE_OPENED;
-        case GATES_STATE_OPENED:
-            return GATES_STATE_CLOSING;
-        case GATES_STATE_CLOSING:
-            return GATES_STATE_CLOSED;
-        default:
-            return GATES_STATE_CLOSED;
-    }
-}
-
-void Gates::gatesStateUpdate()
-{
-    _gatesState = getUpdatedGatesState(_gatesState);
+    _gatesState = newState;
     _stateMgr->setGatesState(_gatesState);
 }
 
-void Gates::doorStateUpdate()
+void Gates::doorStateUpdate(GatesState newState)
 {
-    _doorState = getUpdatedGatesState(_doorState);
+    _doorState = newState;
     _stateMgr->setDoorState(_doorState);
 }
 
@@ -160,4 +186,26 @@ bool Gates::skipCommand(GatesState state, GatesCommand command)
     }
 
     return true;
+}
+
+bool Gates::isMotorOpening()
+{
+    return getPinState(GATE_OPEN) == 0;
+}
+
+bool Gates::isMotorClosing()
+{
+    return getPinState(GATE_CLOSE) == 0;
+}
+
+int Gates::getPinState(int pin)
+{
+    int measurements = 0;
+
+    for (int i = 0; i < 10; i++) {
+        measurements += digitalRead(pin);
+        delayMicroseconds(10);
+    }
+
+    return measurements > 5 ? 1 : 0;
 }

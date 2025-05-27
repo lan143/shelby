@@ -36,10 +36,13 @@ public:
     void loop();
 
 private:
-    GatesState getUpdatedGatesState(GatesState oldState);
-    void gatesStateUpdate();
-    void doorStateUpdate();
+    void gatesStateUpdate(GatesState newState);
+    void doorStateUpdate(GatesState newState);
     bool skipCommand(GatesState state, GatesCommand command);
+
+    bool isMotorOpening();
+    bool isMotorClosing();
+    int getPinState(int pin);
 
 private:
     Relay* _gatesRelay;
@@ -49,7 +52,9 @@ private:
 
     GatesState _gatesState = GATES_STATE_CLOSED;
     GatesState _doorState = GATES_STATE_CLOSED;
-    uint64_t _stateChangeTime = 0;
+    uint64_t _lastMotorUpdateTime = 0;
+    bool _isMotorOpening = false;
+    bool _isMotorClosing = false;
 
     GatesRelayState _state = GATES_RELAY_STATE_IDLE;
     uint64_t _lastRelayStateUpdateTime = 0;

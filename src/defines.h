@@ -12,7 +12,10 @@
 #define RELAY_GATE      2
 #define RELAY_DRAWING   15
 
-#define EEPROM_SIZE 1024
+#define GATE_OPEN       36
+#define GATE_CLOSE      39
+
+#define EEPROM_SIZE     1024
 
 const char deviceName[] = "Shelby";
 const char deviceModel[] = "KC868-A2";
