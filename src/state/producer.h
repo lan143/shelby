@@ -1,8 +1,9 @@
 #pragma once
 
 #include <Arduino.h>
-#include "mqtt/mqtt.h"
-#include "mqtt/producer.h"
+#include <mqtt.h>
+#include <producer.h>
+
 #include "state.h"
 
 class StateProducer : public EDMQTT::Producer

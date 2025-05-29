@@ -2,7 +2,7 @@
 
 #include <Arduino.h>
 #include <WiFi.h>
-#include "mqtt/mqtt_config.h"
+#include <mqtt_config.h>
 
 #define CURRENT_VERSION 1
 

@@ -4,12 +4,13 @@
 #include <ConfigMgr.h>
 #include <esp_log.h>
 #include <discovery.h>
+#include <healthcheck.h>
+#include <mqtt.h>
 
 #include "defines.h"
 #include "config.h"
-#include "command/command_consumer.h"
 #include "gates/gates.h"
-#include "mqtt/mqtt.h"
+#include "command/command_consumer.h"
 #include "network/network.h"
 #include "relay/relay.h"
 #include "state/producer.h"
@@ -18,7 +19,8 @@
 
 EDConfig::ConfigMgr<Config> configMgr(EEPROM_SIZE);
 NetworkMgr networkMgr(configMgr.getConfig(), true);
-EDMQTT::MQTT mqtt(configMgr.getConfig().mqtt, &networkMgr);
+EDHealthCheck::HealthCheck healthCheck;
+EDMQTT::MQTT mqtt(configMgr.getConfig().mqtt);
 EDHA::DiscoveryMgr discoveryMgr;
 Relay gatesRelay;
 Relay doorRelay;
@@ -26,7 +28,7 @@ StateProducer stateProducer(&mqtt);
 StateMgr stateMgr(&stateProducer);
 Gates gates(&gatesRelay, &doorRelay, &stateMgr, &discoveryMgr);
 CommandConsumer commandConsumer(&gates);
-Handler handler(&configMgr, &networkMgr);
+Handler handler(&configMgr, &networkMgr, &healthCheck);
 
 void setup()
 {
@@ -57,6 +59,7 @@ void setup()
 
     mqtt.init();
     mqtt.subscribe(&commandConsumer);
+    healthCheck.registerService(&mqtt);
 
     handler.init();
 
@@ -90,4 +93,5 @@ void loop()
     ArduinoOTA.handle();
     gates.loop();
     stateMgr.loop();
+    healthCheck.loop();
 }

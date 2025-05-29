@@ -1,8 +1,9 @@
 #pragma once
 
 #include <Arduino.h>
+#include <consumer.h>
+
 #include "gates/gates.h"
-#include "mqtt/consumer.h"
 
 class CommandConsumer : public EDMQTT::Consumer
 {
