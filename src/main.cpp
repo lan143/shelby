@@ -58,6 +58,11 @@ void setup()
     stateProducer.init(configMgr.getConfig().mqttStateTopic);
 
     mqtt.init();
+    networkMgr.OnConnect([&](bool isConnected) {
+        if (isConnected) {
+            mqtt.connect();
+        }
+    });
     mqtt.subscribe(&commandConsumer);
     healthCheck.registerService(&mqtt);
 
@@ -87,7 +92,6 @@ void setup()
 
 void loop()
 {
-    mqtt.loop();
     networkMgr.loop();
     discoveryMgr.loop();
     ArduinoOTA.handle();
