@@ -27,12 +27,19 @@ public:
         publishState();
     }
 
+    void setSepticFillingLevel(float_t level)
+    {
+        _septicFillingLevel = level;
+        publishState();
+    }
+
     void loop();
 
 private:
     GatesState _gatesState = GATES_STATE_CLOSED;
     GatesState _doorState = GATES_STATE_CLOSED;
     bool _wateringLawnEnabled = false;
+    float_t _septicFillingLevel = 0.0f;
     unsigned int _lastUpdateStateTime = 0;
 
 private:

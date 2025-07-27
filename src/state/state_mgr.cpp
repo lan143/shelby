@@ -5,7 +5,8 @@ State StateMgr::buildState()
     return State(
         _gatesState,
         _doorState,
-        _wateringLawnEnabled
+        _wateringLawnEnabled,
+        _septicFillingLevel
     );
 }
 

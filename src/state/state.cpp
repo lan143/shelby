@@ -41,6 +41,8 @@ std::string State::marshalJSON()
         } else {
             entity[F("wateringLawnRelay")] = "false";
         }
+
+        entity[F("septicFillingLevel")] = _septicFillingLevel;
     });
 
     return payload;

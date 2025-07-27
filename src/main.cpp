@@ -15,6 +15,7 @@
 #include "network/network.h"
 #include "relay/relay.h"
 #include "relay/wb_relay.h"
+#include "sensor/qdy30a.h"
 #include "state/producer.h"
 #include "state/state_mgr.h"
 #include "web/handler.h"
@@ -33,6 +34,7 @@ EDWB::WirenBoard modbus(Serial2);
 WbRelay wbRelay(&discoveryMgr, &stateMgr, &modbus);
 CommandConsumer commandConsumer(&gates, &wbRelay);
 Handler handler(&configMgr, &networkMgr, &healthCheck, &modbus);
+QDY30A qdy30a(modbus.getClient(), &discoveryMgr, &stateMgr);
 
 void setup()
 {
@@ -51,8 +53,8 @@ void setup()
         snprintf(config.mqttCommandTopic, MQTT_TOPIC_LEN, "shelby/%s/set", EDUtils::getChipID());
         snprintf(config.mqttHADiscoveryPrefix, MQTT_TOPIC_LEN, "homeassistant");
         config.modbusSpeed = 9600;
-        config.addressMR6C = 146;
-        config.addressQDY30A = 2;
+        config.addressQDY30A = 1;
+        config.addressMR6C = 2;
     });
     configMgr.load();
 
@@ -99,6 +101,8 @@ void setup()
 
     wbRelay.init(device, configMgr.getConfig().mqttCommandTopic, configMgr.getConfig().mqttStateTopic, configMgr.getConfig().addressMR6C);
 
+    qdy30a.init(device, configMgr.getConfig().mqttStateTopic, configMgr.getConfig().addressQDY30A);
+
     ESP_LOGI("setup", "complete");
 }
 
@@ -110,4 +114,5 @@ void loop()
     gates.loop();
     stateMgr.loop();
     healthCheck.loop();
+    qdy30a.loop();
 }
