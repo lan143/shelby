@@ -17,6 +17,9 @@
 
 #define EEPROM_SIZE     1024
 
+#define RS485RX  35
+#define RS485TX  32
+
 const char deviceName[] = "Shelby";
 const char deviceModel[] = "KC868-A2";
 const char deviceManufacturer[] = "Kincony";

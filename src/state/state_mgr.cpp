@@ -4,7 +4,8 @@ State StateMgr::buildState()
 {
     return State(
         _gatesState,
-        _doorState
+        _doorState,
+        _wateringLawnEnabled
     );
 }
 

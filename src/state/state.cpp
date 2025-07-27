@@ -35,6 +35,12 @@ std::string State::marshalJSON()
                 entity[F("door_state")] = "open";
                 break;
         }
+
+        if (_isWateringLawnEnabled) {
+            entity[F("wateringLawnRelay")] = "true";
+        } else {
+            entity[F("wateringLawnRelay")] = "false";
+        }
     });
 
     return payload;

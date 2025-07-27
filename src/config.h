@@ -35,4 +35,9 @@ struct Config
     char mqttHADiscoveryPrefix[MQTT_TOPIC_LEN] = {0};
     char mqttCommandTopic[MQTT_TOPIC_LEN] = {0};
     char mqttStateTopic[MQTT_TOPIC_LEN] = {0};
+
+    // modbus
+    uint32_t modbusSpeed = 0;
+    uint8_t addressMR6C = 0;
+    uint8_t addressQDY30A = 0;
 };

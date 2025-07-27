@@ -17,6 +17,11 @@ bool Command::unmarshalJSON(const char* data)
             _doorPayload = root[F("door_payload")].as<std::string>();
         }
 
+        if (root.containsKey(F("wateringLawnRelay"))) {
+            _hasWateringLawn = true;
+            _isEnabledWateringLawn = root[F("wateringLawnRelay")].as<std::string>() == "true";
+        }
+
         return true;
     });
 }

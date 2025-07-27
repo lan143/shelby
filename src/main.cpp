@@ -6,6 +6,7 @@
 #include <discovery.h>
 #include <healthcheck.h>
 #include <mqtt.h>
+#include <wirenboard.h>
 
 #include "defines.h"
 #include "config.h"
@@ -13,6 +14,7 @@
 #include "command/command_consumer.h"
 #include "network/network.h"
 #include "relay/relay.h"
+#include "relay/wb_relay.h"
 #include "state/producer.h"
 #include "state/state_mgr.h"
 #include "web/handler.h"
@@ -27,8 +29,10 @@ Relay doorRelay;
 StateProducer stateProducer(&mqtt);
 StateMgr stateMgr(&stateProducer);
 Gates gates(&gatesRelay, &doorRelay, &stateMgr, &discoveryMgr);
-CommandConsumer commandConsumer(&gates);
-Handler handler(&configMgr, &networkMgr, &healthCheck);
+EDWB::WirenBoard modbus(Serial2);
+WbRelay wbRelay(&discoveryMgr, &stateMgr, &modbus);
+CommandConsumer commandConsumer(&gates, &wbRelay);
+Handler handler(&configMgr, &networkMgr, &healthCheck, &modbus);
 
 void setup()
 {
@@ -46,8 +50,14 @@ void setup()
         snprintf(config.mqttStateTopic, MQTT_TOPIC_LEN, "shelby/%s/state", EDUtils::getChipID());
         snprintf(config.mqttCommandTopic, MQTT_TOPIC_LEN, "shelby/%s/set", EDUtils::getChipID());
         snprintf(config.mqttHADiscoveryPrefix, MQTT_TOPIC_LEN, "homeassistant");
+        config.modbusSpeed = 9600;
+        config.addressMR6C = 146;
+        config.addressQDY30A = 2;
     });
     configMgr.load();
+
+    Serial2.begin(configMgr.getConfig().modbusSpeed, SERIAL_8N1, RS485RX, RS485TX);
+    modbus.init(15);
 
     networkMgr.init();
 
@@ -86,6 +96,8 @@ void setup()
     gatesRelay.init(RELAY_GATE, false);
     doorRelay.init(RELAY_DRAWING, false);
     gates.init(device, configMgr.getConfig().mqttStateTopic, configMgr.getConfig().mqttCommandTopic);
+
+    wbRelay.init(device, configMgr.getConfig().mqttCommandTopic, configMgr.getConfig().mqttStateTopic, configMgr.getConfig().addressMR6C);
 
     ESP_LOGI("setup", "complete");
 }

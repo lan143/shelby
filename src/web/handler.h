@@ -9,6 +9,7 @@
 #include <ESPAsyncWebServer.h>
 #include <ConfigMgr.h>
 #include <healthcheck.h>
+#include <wirenboard.h>
 
 #include "config.h"
 #include "network/network.h"
@@ -18,8 +19,9 @@ public:
     Handler(
         EDConfig::ConfigMgr<Config>* configMgr,
         NetworkMgr* networkMgr,
-        EDHealthCheck::HealthCheck* healthCheck
-    ) : _configMgr(configMgr), _networkMgr(networkMgr), _healthCheck(healthCheck) {
+        EDHealthCheck::HealthCheck* healthCheck,
+        EDWB::WirenBoard* modbus
+    ) : _configMgr(configMgr), _networkMgr(networkMgr), _healthCheck(healthCheck), _modbus(modbus) {
         _server = new AsyncWebServer(80);
     }
 
@@ -30,4 +32,5 @@ private:
     EDConfig::ConfigMgr<Config>* _configMgr;
     NetworkMgr* _networkMgr;
     EDHealthCheck::HealthCheck* _healthCheck;
+    EDWB::WirenBoard* _modbus;
 };

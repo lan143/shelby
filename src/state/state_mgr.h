@@ -21,11 +21,18 @@ public:
         publishState();
     }
 
+    void setWateringLawnState(bool enabled)
+    {
+        _wateringLawnEnabled = enabled;
+        publishState();
+    }
+
     void loop();
 
 private:
     GatesState _gatesState = GATES_STATE_CLOSED;
     GatesState _doorState = GATES_STATE_CLOSED;
+    bool _wateringLawnEnabled = false;
     unsigned int _lastUpdateStateTime = 0;
 
 private:
