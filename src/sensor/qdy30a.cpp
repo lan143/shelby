@@ -16,8 +16,16 @@ void QDY30A::init(EDHA::Device* device, std::string stateTopic, uint8_t address)
         ->setUnitOfMeasurement("m")
         ->setDeviceClass("precipitation");
 
-    _unitOfMeasurement = _client->holdingRegisterRead(_address, 0x0002);
-    _dotPosition = _client->holdingRegisterRead(_address, 0x0003);
+    for (int i = 0; i < 20; i++) {
+        _unitOfMeasurement = _client->holdingRegisterRead(_address, 0x0002);
+        _dotPosition = _client->holdingRegisterRead(_address, 0x0003);
+
+        if (_unitOfMeasurement != -1 && _dotPosition != -1) {
+            break;
+        }
+
+        delay(500);
+    }
 }
 
 void QDY30A::loop()
@@ -25,6 +33,7 @@ void QDY30A::loop()
     if ((_lastUpdateTime + 60000) < millis()) {
         int32_t level = _client->holdingRegisterRead(_address, 0x0004);
         if (level == -1) {
+            _lastUpdateTime = millis();
             return;
         }
 
@@ -53,7 +62,6 @@ void QDY30A::loop()
         }
 
         _stateMgr->setSepticFillingLevel(convertLevel);
-
         _lastUpdateTime = millis();
     }
 }
