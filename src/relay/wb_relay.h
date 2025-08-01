@@ -19,6 +19,9 @@ public:
 
     void wateringLawnChangeState(bool enabled);
 
+    void parkingLightChangeState(bool enabled);
+    void streetLightChangeState(bool enabled);
+
 private:
     EDHA::DiscoveryMgr* _discoveryMgr = NULL;
     StateMgr* _stateMgr = NULL;

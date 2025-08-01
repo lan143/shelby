@@ -10,11 +10,15 @@ public:
         GatesState gatesState,
         GatesState doorState,
         bool isWateringLawnEnabled,
+        bool isParkingLightEnabled,
+        bool isStreetLightEnabled,
         float_t septicFillingLevel,
         float_t septicFillingVolume
     ) : _gatesState(gatesState),
         _doorState(doorState),
         _isWateringLawnEnabled(isWateringLawnEnabled),
+        _isParkingLightEnabled(isParkingLightEnabled),
+        _isStreetLightEnabled(isStreetLightEnabled),
         _septicFillingLevel(septicFillingLevel),
         _septicFillingVolume(septicFillingVolume) {}
 
@@ -24,6 +28,8 @@ private:
     GatesState _gatesState = GATES_STATE_CLOSED;
     GatesState _doorState = GATES_STATE_CLOSED;
     bool _isWateringLawnEnabled = false;
+    bool _isParkingLightEnabled = false;
+    bool _isStreetLightEnabled = false;
     float_t _septicFillingLevel = 0.0f;
     float_t _septicFillingVolume = 0.0f;
 };

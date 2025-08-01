@@ -42,6 +42,18 @@ std::string State::marshalJSON()
             entity[F("wateringLawnRelay")] = "false";
         }
 
+        if (_isParkingLightEnabled) {
+            entity[F("parkingLight")] = "true";
+        } else {
+            entity[F("parkingLight")] = "false";
+        }
+        
+        if (_isStreetLightEnabled) {
+            entity[F("streetLight")] = "true";
+        } else {
+            entity[F("streetLight")] = "false";
+        }
+
         if (_septicFillingLevel != 0.0f) {
             entity[F("septicFillingLevel")] = _septicFillingLevel;
         }

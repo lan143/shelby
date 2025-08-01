@@ -22,6 +22,16 @@ bool Command::unmarshalJSON(const char* data)
             _isEnabledWateringLawn = root[F("wateringLawnRelay")].as<std::string>() == "true";
         }
 
+        if (root.containsKey(F("parkingLight"))) {
+            _hasParkingLight = true;
+            _isEnabledParkingLight = root[F("parkingLight")].as<std::string>() == "true";
+        }
+
+        if (root.containsKey(F("streetLight"))) {
+            _hasStreetLight = true;
+            _isEnabledStreetLight = root[F("streetLight")].as<std::string>() == "true";
+        }
+
         return true;
     });
 }

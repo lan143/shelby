@@ -24,6 +24,14 @@ void CommandConsumer::consume(std::string payload)
     if (command.hasWateringLawn()) {
         _wbRelay->wateringLawnChangeState(command.isEnabledWateringLawn());
     }
+
+    if (command.hasParkingLight()) {
+        _wbRelay->parkingLightChangeState(command.isEnabledParkingLight());
+    }
+
+    if (command.hasStreetLight()) {
+        _wbRelay->streetLightChangeState(command.isEnabledStreetLight());
+    }
 }
 
 GatesCommand CommandConsumer::mapCommand(std::string command)

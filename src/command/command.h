@@ -16,6 +16,12 @@ public:
     bool hasWateringLawn() { return _hasWateringLawn; }
     bool isEnabledWateringLawn() { return _isEnabledWateringLawn; }
 
+    bool hasParkingLight() { return _hasParkingLight; }
+    bool isEnabledParkingLight() { return _isEnabledParkingLight; }
+
+    bool hasStreetLight() { return _hasStreetLight; }
+    bool isEnabledStreetLight() { return _isEnabledStreetLight; }
+
 private:
     bool _hasGatesPayload = false;
     std::string _gatesPayload = "";
@@ -25,4 +31,10 @@ private:
 
     bool _hasWateringLawn = false;
     bool _isEnabledWateringLawn = false;
+
+    bool _hasParkingLight = false;
+    bool _isEnabledParkingLight = false;
+
+    bool _hasStreetLight = false;
+    bool _isEnabledStreetLight = false;
 };
