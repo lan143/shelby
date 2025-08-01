@@ -9,8 +9,11 @@ class QDY30A
 {
 public:
     QDY30A(ModbusClient* client, EDHA::DiscoveryMgr* discoveryMgr, StateMgr* stateMgr) : _client(client), _discoveryMgr(discoveryMgr), _stateMgr(stateMgr) {}
-    void init(EDHA::Device* device, std::string stateTopic, uint8_t address);
+    void init(EDHA::Device* device, std::string stateTopic, uint8_t address, float_t septicDiameter);
     void loop();
+
+private:
+    void loadConstants();
 
 private:
     ModbusClient* _client = NULL;
@@ -18,8 +21,10 @@ private:
     StateMgr* _stateMgr = NULL;
 
     uint8_t _address = 0;
+    bool _isLoaded = false;
     int32_t _unitOfMeasurement = 0;
     int32_t _dotPosition = 0;
+    float_t _septicDiameter = 0.0f;
 
-    uint64_t _lastUpdateTime = 0;
+    unsigned long _nextUpdateTime = 0;
 };

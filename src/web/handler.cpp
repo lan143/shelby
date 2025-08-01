@@ -134,6 +134,7 @@ void Handler::init()
             entity["mqttHADiscoveryPrefix"] = config.mqttHADiscoveryPrefix;
             entity["mqttCommandTopic"] = config.mqttCommandTopic;
             entity["mqttStateTopic"] = config.mqttStateTopic;
+            entity["septicDiameter"] = config.septicDiameter;
         });
 
         response->write(payload.c_str());
@@ -246,6 +247,27 @@ void Handler::init()
             config.mqttIsHADiscovery = false;
         }
 
+        _configMgr->store();
+
+        request->send(200, "application/json", "{}");
+    });
+
+    _server->on("/api/settings", HTTP_POST, [this](AsyncWebServerRequest *request) {
+        if (!request->hasParam("septicDiameter", true)) {
+            request->send(422, "application/json", "{\"message\": \"not present mqtt params in request\"}");
+            return;
+        }
+
+        Config& config = _configMgr->getConfig();
+        const AsyncWebParameter* septicDiameterParam = request->getParam("septicDiameter", true);
+
+        float_t septicDiameter;
+        if (EDUtils::str2float(&septicDiameter, septicDiameterParam->value().c_str()) != EDUtils::STR2INT_SUCCESS) {
+            request->send(422, "application/json", "{\"message\": \"Incorrect septic diameter\"}");
+            return;
+        }
+
+        config.septicDiameter = septicDiameter;
         _configMgr->store();
 
         request->send(200, "application/json", "{}");

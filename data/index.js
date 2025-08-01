@@ -32,6 +32,8 @@ function loadSettings() {
             if (data.mqttIsHADiscovery) {
                 $('form#mqtt input[name=mqttIsHADiscovery]').prop('checked', true);
             }
+
+            $('form#other-settings input[name=septicDiameter]').val(data.septicDiameter);
         },
         error: function (xhr, str) {
             alert('Errors while loading settings');
@@ -185,6 +187,34 @@ $(function() {
             error: function (xhr, str) {
                 var data = JSON.parse(xhr.responseText);
                 alert('Errors while save modbus settings: ' + data.message);
+            }
+        });
+
+        return false;
+    });
+
+    $('form#other-settings').submit(function(event) {
+        event.preventDefault();
+
+        $.ajax({
+            type: 'POST',
+            url: '/api/settings',
+            dataType: 'json',
+            data: {
+                septicDiameter: $(this).find('input[name=septicDiameter]').val()
+            },
+            success: function (data) {
+                alert('Settings successful changed. Reboot...');
+
+                $.ajax({
+                    type: 'POST',
+                    url: '/api/reboot',
+                    dataType: 'json'
+                });
+            },
+            error: function (xhr, str) {
+                var data = JSON.parse(xhr.responseText);
+                alert('Errors while save settings: ' + data.message);
             }
         });
 

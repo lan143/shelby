@@ -40,4 +40,7 @@ struct Config
     uint32_t modbusSpeed = 0;
     uint8_t addressMR6C = 0;
     uint8_t addressQDY30A = 0;
+
+    // septic
+    float_t septicDiameter = 0.0f;
 };

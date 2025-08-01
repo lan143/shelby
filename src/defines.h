@@ -15,7 +15,7 @@
 #define GATE_OPEN       36
 #define GATE_CLOSE      39
 
-#define EEPROM_SIZE     1024
+#define EEPROM_SIZE     1500
 
 #define RS485RX  35
 #define RS485TX  32

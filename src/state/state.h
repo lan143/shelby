@@ -10,11 +10,13 @@ public:
         GatesState gatesState,
         GatesState doorState,
         bool isWateringLawnEnabled,
-        float_t septicFillingLevel
+        float_t septicFillingLevel,
+        float_t septicFillingVolume
     ) : _gatesState(gatesState),
         _doorState(doorState),
         _isWateringLawnEnabled(isWateringLawnEnabled),
-        _septicFillingLevel(septicFillingLevel) {}
+        _septicFillingLevel(septicFillingLevel),
+        _septicFillingVolume(septicFillingVolume) {}
 
     std::string marshalJSON();
 
@@ -23,4 +25,5 @@ private:
     GatesState _doorState = GATES_STATE_CLOSED;
     bool _isWateringLawnEnabled = false;
     float_t _septicFillingLevel = 0.0f;
+    float_t _septicFillingVolume = 0.0f;
 };

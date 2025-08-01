@@ -55,6 +55,7 @@ void setup()
         config.modbusSpeed = 9600;
         config.addressQDY30A = 1;
         config.addressMR6C = 2;
+        config.septicDiameter = 1.4f;
     });
     configMgr.load();
 
@@ -101,7 +102,7 @@ void setup()
 
     wbRelay.init(device, configMgr.getConfig().mqttCommandTopic, configMgr.getConfig().mqttStateTopic, configMgr.getConfig().addressMR6C);
 
-    qdy30a.init(device, configMgr.getConfig().mqttStateTopic, configMgr.getConfig().addressQDY30A);
+    qdy30a.init(device, configMgr.getConfig().mqttStateTopic, configMgr.getConfig().addressQDY30A, configMgr.getConfig().septicDiameter);
 
     ESP_LOGI("setup", "complete");
 }

@@ -1,8 +1,10 @@
+#include <math.h>
 #include "qdy30a.h"
 
-void QDY30A::init(EDHA::Device* device, std::string stateTopic, uint8_t address)
+void QDY30A::init(EDHA::Device* device, std::string stateTopic, uint8_t address, float_t septicDiameter)
 {
     _address = address;
+    _septicDiameter = septicDiameter;
 
     const char* chipID = EDUtils::getChipID();
     _discoveryMgr->addSensor(
@@ -16,24 +18,37 @@ void QDY30A::init(EDHA::Device* device, std::string stateTopic, uint8_t address)
         ->setUnitOfMeasurement("m")
         ->setDeviceClass("precipitation");
 
-    for (int i = 0; i < 20; i++) {
-        _unitOfMeasurement = _client->holdingRegisterRead(_address, 0x0002);
-        _dotPosition = _client->holdingRegisterRead(_address, 0x0003);
-
-        if (_unitOfMeasurement != -1 && _dotPosition != -1) {
-            break;
-        }
-
-        delay(500);
+    if (_septicDiameter != 0.0f) {
+        _discoveryMgr->addSensor(
+            device,
+            "Septic tank filling volume",
+            "septicFillingVolume",
+            EDUtils::formatString("septic_filling_volume_shelby_%s", chipID)
+        )
+            ->setStateTopic(stateTopic)
+            ->setValueTemplate("{{ value_json.septicFillingVolume }}")
+            ->setUnitOfMeasurement("m3")
+            ->setDeviceClass("precipitation");
     }
 }
 
 void QDY30A::loop()
 {
-    if ((_lastUpdateTime + 60000) < millis()) {
+    unsigned long currentTime = millis();
+
+    if (_nextUpdateTime < currentTime) {
+        if (!_isLoaded) {
+            loadConstants();
+        }
+
+        if (!_isLoaded) {
+            _nextUpdateTime = currentTime + 1000;
+            return;
+        }
+
         int32_t level = _client->holdingRegisterRead(_address, 0x0004);
-        if (level == -1) {
-            _lastUpdateTime = millis();
+        if (level == -1 || level == 0) {
+            _nextUpdateTime = currentTime + 5000;
             return;
         }
 
@@ -62,6 +77,20 @@ void QDY30A::loop()
         }
 
         _stateMgr->setSepticFillingLevel(convertLevel);
-        _lastUpdateTime = millis();
+        if (_septicDiameter != 0.0f) {
+            _stateMgr->setSepticFillingVolume(M_PI * pow(_septicDiameter / 2, 2) * convertLevel);
+        }
+
+        _nextUpdateTime = currentTime + 60000;
+    }
+}
+
+void QDY30A::loadConstants()
+{
+    _unitOfMeasurement = _client->holdingRegisterRead(_address, 0x0002);
+    _dotPosition = _client->holdingRegisterRead(_address, 0x0003);
+
+    if (_unitOfMeasurement != -1 && _dotPosition != -1) {
+        _isLoaded = true;
     }
 }
