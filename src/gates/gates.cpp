@@ -159,13 +159,13 @@ void Gates::loop()
 void Gates::gatesStateUpdate(GatesState newState)
 {
     _gatesState = newState;
-    _stateMgr->setGatesState(_gatesState);
+    _stateMgr->getState().setGatesState(_gatesState);
 }
 
 void Gates::doorStateUpdate(GatesState newState)
 {
     _doorState = newState;
-    _stateMgr->setDoorState(_doorState);
+    _stateMgr->getState().setDoorState(_doorState);
 }
 
 bool Gates::skipCommand(GatesState state, GatesCommand command)

@@ -54,17 +54,17 @@ void WbRelay::init(EDHA::Device* device, std::string commandTopic, std::string s
 void WbRelay::wateringLawnChangeState(bool enabled)
 {
     _mr6cDevice->setRelayChannelState(1, enabled);
-    _stateMgr->setWateringLawnState(enabled);
+    _stateMgr->getState().setWateringLawnState(enabled);
 }
 
 void WbRelay::parkingLightChangeState(bool enabled)
 {
     _mr6cDevice->setRelayChannelState(4, enabled);
-    _stateMgr->setParkingLightState(enabled);
+    _stateMgr->getState().setParkingLightState(enabled);
 }
 
 void WbRelay::streetLightChangeState(bool enabled)
 {
     _mr6cDevice->setRelayChannelState(5, enabled);
-    _stateMgr->setStreetLightState(enabled);
+    _stateMgr->getState().setStreetLightState(enabled);
 }

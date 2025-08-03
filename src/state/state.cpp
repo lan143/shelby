@@ -3,6 +3,17 @@
 #include "defines.h"
 #include "state.h"
 
+bool State::operator==(State& other)
+{
+    return (*this)._gatesState == other._gatesState
+        && (*this)._doorState == other._doorState
+        && (*this)._isWateringLawnEnabled == other._isWateringLawnEnabled
+        && (*this)._isParkingLightEnabled == other._isParkingLightEnabled
+        && (*this)._isStreetLightEnabled == other._isStreetLightEnabled
+        && (*this)._septicFillingLevel == other._septicFillingLevel
+        && (*this)._septicFillingVolume == other._septicFillingVolume;
+}
+
 std::string State::marshalJSON()
 {
     std::string payload = EDUtils::buildJson([this](JsonObject entity) {

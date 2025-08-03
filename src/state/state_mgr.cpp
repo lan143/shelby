@@ -1,28 +1,12 @@
 #include "state_mgr.h"
 
-State StateMgr::buildState()
-{
-    return State(
-        _gatesState,
-        _doorState,
-        _wateringLawnEnabled,
-        _parkingLightEnabled,
-        _streetLightEnabled,
-        _septicFillingLevel,
-        _septicFillingVolume
-    );
-}
-
-void StateMgr::publishState()
-{
-    State state = buildState();
-    _producer->publish(&state);
-}
-
 void StateMgr::loop()
 {
-    if ((_lastUpdateStateTime + 20000) < millis()) {
-        publishState();
-        _lastUpdateStateTime = millis();
+    if (_nextUpdateTime < millis()) {
+        if (_oldState != _newState && _producer->publish(&_newState)) {
+            _oldState = _newState;
+        }
+
+        _nextUpdateTime = millis() + 500;
     }
 }

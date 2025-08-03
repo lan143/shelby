@@ -6,21 +6,48 @@
 class State
 {
 public:
-    State(
-        GatesState gatesState,
-        GatesState doorState,
-        bool isWateringLawnEnabled,
-        bool isParkingLightEnabled,
-        bool isStreetLightEnabled,
-        float_t septicFillingLevel,
-        float_t septicFillingVolume
-    ) : _gatesState(gatesState),
-        _doorState(doorState),
-        _isWateringLawnEnabled(isWateringLawnEnabled),
-        _isParkingLightEnabled(isParkingLightEnabled),
-        _isStreetLightEnabled(isStreetLightEnabled),
-        _septicFillingLevel(septicFillingLevel),
-        _septicFillingVolume(septicFillingVolume) {}
+    void setGatesState(GatesState gatesState)
+    {
+        _gatesState = gatesState;
+    }
+
+    void setDoorState(GatesState doorState)
+    {
+        _doorState = doorState;
+    }
+
+    void setWateringLawnState(bool enabled)
+    {
+        _isWateringLawnEnabled = enabled;
+    }
+
+    void setParkingLightState(bool enabled)
+    {
+        _isParkingLightEnabled = enabled;
+    }
+
+    void setStreetLightState(bool enabled)
+    {
+        _isStreetLightEnabled = enabled;
+    }
+
+    void setSepticFillingLevel(float_t level)
+    {
+        _septicFillingLevel = level;
+    }
+
+    float_t getSepticFillingLevel() const { return _septicFillingLevel; }
+
+    void setSepticFillingVolume(float_t volume)
+    {
+        _septicFillingVolume = volume;
+    }
+
+    bool operator==(State& other);
+    bool operator!=(State& other)
+    {
+        return !(*this == other);
+    }
 
     std::string marshalJSON();
 

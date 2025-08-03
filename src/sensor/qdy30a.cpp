@@ -76,10 +76,14 @@ void QDY30A::loop()
                 break;
         }
 
-        _stateMgr->setSepticFillingLevel(float_t(uint32_t(convertLevel*1000.0f))/1000.0f);
-        if (_septicDiameter != 0.0f) {
-            float_t volume = M_PI * pow(_septicDiameter / 2, 2) * convertLevel;
-            _stateMgr->setSepticFillingVolume(float_t(uint32_t(volume*1000.0f))/1000.0f);
+        convertLevel = float_t(uint32_t(convertLevel*1000.0f))/1000.0f;
+
+        if (_stateMgr->getState().getSepticFillingLevel() != convertLevel) {
+            _stateMgr->getState().setSepticFillingLevel(float_t(uint32_t(convertLevel*1000.0f))/1000.0f);
+            if (_septicDiameter != 0.0f) {
+                float_t volume = M_PI * pow(_septicDiameter / 2, 2) * convertLevel;
+                _stateMgr->getState().setSepticFillingVolume(float_t(uint32_t(volume*1000.0f))/1000.0f);
+            }
         }
 
         _nextUpdateTime = currentTime + 60000;

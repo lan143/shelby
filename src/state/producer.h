@@ -11,5 +11,5 @@ class StateProducer : public EDMQTT::Producer
 public:
     StateProducer(EDMQTT::MQTT* mqtt) : EDMQTT::Producer(mqtt) {}
 
-    void publish(State* state);
+    bool publish(State* state);
 };
