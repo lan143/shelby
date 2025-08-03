@@ -1,3 +1,4 @@
+#include <Utils.h>
 #include "wb_relay.h"
 
 void WbRelay::init(EDHA::Device* device, std::string commandTopic, std::string stateTopic, uint8_t address)

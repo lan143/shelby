@@ -1,4 +1,5 @@
 #include <math.h>
+#include <Utils.h>
 #include "qdy30a.h"
 
 void QDY30A::init(EDHA::Device* device, std::string stateTopic, uint8_t address, float_t septicDiameter)

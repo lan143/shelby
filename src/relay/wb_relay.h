@@ -3,15 +3,16 @@
 #include <discovery.h>
 #include <wirenboard.h>
 #include <device/wb_mr6c.h>
+#include <state/state_mgr.h>
 
-#include "state/state_mgr.h"
+#include "state/state.h"
 
 class WbRelay
 {
 public:
     WbRelay(
         EDHA::DiscoveryMgr* discoveryMgr,
-        StateMgr* stateMgr,
+        EDUtils::StateMgr<State>* stateMgr,
         EDWB::WirenBoard* modbus
     ) : _discoveryMgr(discoveryMgr), _stateMgr(stateMgr), _modbus(modbus) {}
 
@@ -24,7 +25,7 @@ public:
 
 private:
     EDHA::DiscoveryMgr* _discoveryMgr = NULL;
-    StateMgr* _stateMgr = NULL;
+    EDUtils::StateMgr<State>* _stateMgr = NULL;
     EDWB::WirenBoard* _modbus = NULL;
     EDWB::MR6C* _mr6cDevice = NULL;
 };

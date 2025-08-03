@@ -7,6 +7,7 @@
 #include <healthcheck.h>
 #include <mqtt.h>
 #include <wirenboard.h>
+#include <state/state_mgr.h>
 
 #include "defines.h"
 #include "config.h"
@@ -16,8 +17,8 @@
 #include "relay/relay.h"
 #include "relay/wb_relay.h"
 #include "sensor/qdy30a.h"
+#include "state/state.h"
 #include "state/producer.h"
-#include "state/state_mgr.h"
 #include "web/handler.h"
 
 EDConfig::ConfigMgr<Config> configMgr(EEPROM_SIZE);
@@ -28,7 +29,7 @@ EDHA::DiscoveryMgr discoveryMgr;
 Relay gatesRelay;
 Relay doorRelay;
 StateProducer stateProducer(&mqtt);
-StateMgr stateMgr(&stateProducer);
+EDUtils::StateMgr<State> stateMgr(&stateProducer);
 Gates gates(&gatesRelay, &doorRelay, &stateMgr, &discoveryMgr);
 EDWB::WirenBoard modbus(Serial2);
 WbRelay wbRelay(&discoveryMgr, &stateMgr, &modbus);

@@ -1,9 +1,10 @@
 #pragma once
 
 #include <discovery.h>
+#include <state/state_mgr.h>
 #include "gates_state.h"
 #include "relay/relay.h"
-#include "state/state_mgr.h"
+#include "state/state.h"
 
 enum GatesRelayState : int
 {
@@ -24,7 +25,7 @@ enum GatesCommand : int
 class Gates
 {
 public:
-    Gates(Relay* gatesRelay, Relay* doorRelay, StateMgr* stateMgr, EDHA::DiscoveryMgr* discoveryMgr) :
+    Gates(Relay* gatesRelay, Relay* doorRelay, EDUtils::StateMgr<State>* stateMgr, EDHA::DiscoveryMgr* discoveryMgr) :
         _gatesRelay(gatesRelay), _doorRelay(doorRelay), _stateMgr(stateMgr), _discoveryMgr(discoveryMgr) {}
 
 public:
@@ -47,7 +48,7 @@ private:
 private:
     Relay* _gatesRelay;
     Relay* _doorRelay;
-    StateMgr* _stateMgr;
+    EDUtils::StateMgr<State>* _stateMgr;
     EDHA::DiscoveryMgr* _discoveryMgr;
 
     GatesState _gatesState = GATES_STATE_CLOSED;
