@@ -43,6 +43,11 @@ public:
         _septicFillingVolume = volume;
     }
 
+    void setSepticAvgAbsorptionSpeed(float_t speed)
+    {
+        _septicAvgAbsorptionSpeed = speed;
+    }
+
     bool operator==(State& other);
     bool operator!=(State& other)
     {
@@ -59,4 +64,5 @@ private:
     bool _isStreetLightEnabled = false;
     float_t _septicFillingLevel = 0.0f;
     float_t _septicFillingVolume = 0.0f;
+    float_t _septicAvgAbsorptionSpeed = 0.0f;
 };

@@ -11,7 +11,8 @@ bool State::operator==(State& other)
         && (*this)._isParkingLightEnabled == other._isParkingLightEnabled
         && (*this)._isStreetLightEnabled == other._isStreetLightEnabled
         && (*this)._septicFillingLevel == other._septicFillingLevel
-        && (*this)._septicFillingVolume == other._septicFillingVolume;
+        && (*this)._septicFillingVolume == other._septicFillingVolume
+        && (*this)._septicAvgAbsorptionSpeed == other._septicAvgAbsorptionSpeed;
 }
 
 std::string State::marshalJSON()
@@ -72,6 +73,8 @@ std::string State::marshalJSON()
         if (_septicFillingVolume != 0.0f) {
             entity[F("septicFillingVolume")] = _septicFillingVolume;
         }
+
+        entity[F("septicAvgAbsorptionSpeed")] = _septicAvgAbsorptionSpeed;
     });
 
     return payload;

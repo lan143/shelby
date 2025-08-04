@@ -15,6 +15,7 @@ public:
 
 private:
     void loadConstants();
+    void calculateAbsorptionSpeed(float_t level, float_t volume);
 
 private:
     ModbusClient* _client = NULL;
@@ -26,6 +27,10 @@ private:
     int32_t _unitOfMeasurement = 0;
     int32_t _dotPosition = 0;
     float_t _septicDiameter = 0.0f;
+
+    float_t _lastVolume = 0.0f;
+    float_t _avgAbsorptionSpeed = 0.0f;
+    unsigned long _lastChangeTime = 0;
 
     unsigned long _nextUpdateTime = 0;
 };

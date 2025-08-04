@@ -30,6 +30,17 @@ void QDY30A::init(EDHA::Device* device, std::string stateTopic, uint8_t address,
             ->setValueTemplate("{{ value_json.septicFillingVolume }}")
             ->setUnitOfMeasurement("m3")
             ->setDeviceClass("precipitation");
+
+        _discoveryMgr->addSensor(
+            device,
+            "Septic tank average absorption speed",
+            "septicAvgAbsorptionSpeed",
+            EDUtils::formatString("septic_avg_absorption_speed_shelby_%s", chipID)
+        )
+            ->setStateTopic(stateTopic)
+            ->setValueTemplate("{{ value_json.septicAvgAbsorptionSpeed }}")
+            ->setUnitOfMeasurement("l/h")
+            ->setDeviceClass("precipitation");
     }
 }
 
@@ -84,6 +95,7 @@ void QDY30A::loop()
             if (_septicDiameter != 0.0f) {
                 float_t volume = M_PI * pow(_septicDiameter / 2, 2) * convertLevel;
                 _stateMgr->getState().setSepticFillingVolume(float_t(uint32_t(volume*1000.0f))/1000.0f);
+                calculateAbsorptionSpeed(convertLevel, volume);
             }
         }
 
@@ -99,4 +111,20 @@ void QDY30A::loadConstants()
     if (_unitOfMeasurement != -1 && _dotPosition != -1) {
         _isLoaded = true;
     }
+}
+
+void QDY30A::calculateAbsorptionSpeed(float_t level, float_t volume)
+{
+    if (volume < _lastVolume && level < 2.9) { // todo: move constant from level check to config
+        float_t dt = float_t(millis() - _lastChangeTime)/1000.0f;
+        float_t dv = _lastVolume - volume;
+        float_t speed = dv / dt;
+        _avgAbsorptionSpeed += speed;
+        _avgAbsorptionSpeed /= 2;
+
+        _stateMgr->getState().setSepticAvgAbsorptionSpeed(_avgAbsorptionSpeed * 1000 * 3600);
+    }
+
+    _lastVolume = volume;
+    _lastChangeTime = millis();
 }
