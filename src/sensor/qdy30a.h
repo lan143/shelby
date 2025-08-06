@@ -6,6 +6,8 @@
 
 #include "state/state.h"
 
+#define DV_BUFFER_SIZE 10
+
 class QDY30A
 {
 public:
@@ -29,7 +31,8 @@ private:
     float_t _septicDiameter = 0.0f;
 
     float_t _lastVolume = 0.0f;
-    float_t _avgAbsorptionSpeed = 0.0f;
+    float_t _dspeed[DV_BUFFER_SIZE] = {0};
+    uint8_t _dspeedIdx= 0;
     unsigned long _lastChangeTime = 0;
 
     unsigned long _nextUpdateTime = 0;

@@ -119,10 +119,23 @@ void QDY30A::calculateAbsorptionSpeed(float_t level, float_t volume)
         float_t dt = float_t(millis() - _lastChangeTime)/1000.0f;
         float_t dv = _lastVolume - volume;
         float_t speed = dv / dt;
-        _avgAbsorptionSpeed += speed;
-        _avgAbsorptionSpeed /= 2;
+        speed = speed * 1000 * 3600;
 
-        _stateMgr->getState().setSepticAvgAbsorptionSpeed(_avgAbsorptionSpeed * 1000 * 3600);
+        _dspeed[_dspeedIdx] = speed;
+        _dspeedIdx++;
+        if (_dspeedIdx >= DV_BUFFER_SIZE) {
+            _dspeedIdx = 0;    
+        }
+        
+        float_t avgAbsorptionSpeed;
+        for (uint8_t i = 0; i < DV_BUFFER_SIZE; i++) {
+            avgAbsorptionSpeed += _dspeed[i];
+        }
+
+        avgAbsorptionSpeed /= DV_BUFFER_SIZE;
+        avgAbsorptionSpeed = float_t(uint32_t(avgAbsorptionSpeed*100.0f))/100.0f;
+
+        _stateMgr->getState().setSepticAvgAbsorptionSpeed(avgAbsorptionSpeed);
     }
 
     _lastVolume = volume;
