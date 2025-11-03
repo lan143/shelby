@@ -48,6 +48,11 @@ public:
         _septicAvgAbsorptionSpeed = speed;
     }
 
+    void setSepticAvgIncomingSpeed(float_t speed)
+    {
+        _septicAvgIncomingSpeed = speed;
+    }
+
     bool operator==(State& other);
     bool operator!=(State& other)
     {
@@ -65,4 +70,5 @@ private:
     float_t _septicFillingLevel = 0.0f;
     float_t _septicFillingVolume = 0.0f;
     float_t _septicAvgAbsorptionSpeed = 0.0f;
+    float_t _septicAvgIncomingSpeed = 0.0f;
 };
