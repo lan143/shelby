@@ -147,7 +147,7 @@ void QDY30A::calculateAbsorptionSpeed(float_t level, float_t volume)
             _dspeedIdx = 0;    
         }
         
-        float_t avgAbsorptionSpeed;
+        float_t avgAbsorptionSpeed = 0.0f;
         for (uint8_t i = 0; i < DV_BUFFER_SIZE; i++) {
             avgAbsorptionSpeed += _dspeed[i];
         }
@@ -169,7 +169,7 @@ void QDY30A::calculateIncomingSpeed(float_t level, float_t volume)
     bool needUpdateIncomingSpeed = false;
 
     if (_lastIncomingVolume > 0.0f && volume > _lastIncomingVolume && level < 2.8) { // todo: move constant from level check to config
-        float_t dt = float_t(millis() - _lastChangeTime)/1000.0f;
+        float_t dt = float_t(millis() - _lastIncomingChangeTime)/1000.0f;
         float_t dv = volume - _lastIncomingVolume;
         incomingSpeed = dv / dt;
         incomingSpeed = incomingSpeed * 1000 * 3600;
@@ -185,7 +185,7 @@ void QDY30A::calculateIncomingSpeed(float_t level, float_t volume)
             _dIncomeSpeedIdx = 0;    
         }
         
-        float_t avgIncomingSpeed;
+        float_t avgIncomingSpeed = 0.0f;
         for (uint8_t i = 0; i < DV_BUFFER_SIZE; i++) {
             avgIncomingSpeed += _dIncomeSpeed[i];
         }
