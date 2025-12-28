@@ -22,6 +22,7 @@ public:
 
     void parkingLightChangeState(bool enabled);
     void streetLightChangeState(bool enabled);
+    void decorativeLightChangeState(bool enabled);
 
 private:
     EDHA::DiscoveryMgr* _discoveryMgr = NULL;

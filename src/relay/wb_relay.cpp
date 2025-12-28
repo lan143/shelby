@@ -50,6 +50,21 @@ void WbRelay::init(EDHA::Device* device, std::string commandTopic, std::string s
         ->setPayloadOff("false")
         ->setStateOn("true")
         ->setStateOff("false");
+
+    _discoveryMgr->addSwitch(
+        device,
+        "Decorative light",
+        "decorativeLight",
+        EDUtils::formatString("decorative_light_relay_shelby_%s", chipID)
+    )
+        ->setCommandTemplate("{\"decorativeLight\": {{ value }} }")
+        ->setCommandTopic(commandTopic)
+        ->setStateTopic(stateTopic)
+        ->setValueTemplate("{{ value_json.decorativeLight }}")
+        ->setPayloadOn("true")
+        ->setPayloadOff("false")
+        ->setStateOn("true")
+        ->setStateOff("false");
 }
 
 void WbRelay::wateringLawnChangeState(bool enabled)
@@ -60,12 +75,18 @@ void WbRelay::wateringLawnChangeState(bool enabled)
 
 void WbRelay::parkingLightChangeState(bool enabled)
 {
-    _mr6cDevice->setRelayChannelState(4, enabled);
+    _mr6cDevice->setRelayChannelState(5, enabled);
     _stateMgr->getState().setParkingLightState(enabled);
 }
 
 void WbRelay::streetLightChangeState(bool enabled)
 {
-    _mr6cDevice->setRelayChannelState(5, enabled);
+    _mr6cDevice->setRelayChannelState(6, enabled);
     _stateMgr->getState().setStreetLightState(enabled);
+}
+
+void WbRelay::decorativeLightChangeState(bool enabled)
+{
+    _mr6cDevice->setRelayChannelState(4, enabled);
+    _stateMgr->getState().setDecorativeLightState(enabled);
 }

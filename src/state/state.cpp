@@ -10,6 +10,7 @@ bool State::operator==(State& other)
         && (*this)._isWateringLawnEnabled == other._isWateringLawnEnabled
         && (*this)._isParkingLightEnabled == other._isParkingLightEnabled
         && (*this)._isStreetLightEnabled == other._isStreetLightEnabled
+        && (*this)._isDecorativeLightEnabled == other._isDecorativeLightEnabled
         && (*this)._septicFillingLevel == other._septicFillingLevel
         && (*this)._septicFillingVolume == other._septicFillingVolume
         && (*this)._septicAvgAbsorptionSpeed == other._septicAvgAbsorptionSpeed
@@ -65,6 +66,12 @@ std::string State::marshalJSON()
             entity[F("streetLight")] = "true";
         } else {
             entity[F("streetLight")] = "false";
+        }
+
+        if (_isDecorativeLightEnabled) {
+            entity[F("decorativeLight")] = "true";
+        } else {
+            entity[F("decorativeLight")] = "false";
         }
 
         if (_septicFillingLevel != 0.0f) {

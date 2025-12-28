@@ -31,6 +31,11 @@ public:
         _isStreetLightEnabled = enabled;
     }
 
+    void setDecorativeLightState(bool enabled)
+    {
+        _isDecorativeLightEnabled = enabled;
+    }
+
     void setSepticFillingLevel(float_t level)
     {
         _septicFillingLevel = level;
@@ -67,6 +72,7 @@ private:
     bool _isWateringLawnEnabled = false;
     bool _isParkingLightEnabled = false;
     bool _isStreetLightEnabled = false;
+    bool _isDecorativeLightEnabled = false;
     float_t _septicFillingLevel = 0.0f;
     float_t _septicFillingVolume = 0.0f;
     float_t _septicAvgAbsorptionSpeed = 0.0f;

@@ -75,6 +75,8 @@ void setup()
     networkMgr.OnConnect([&](bool isConnected) {
         if (isConnected) {
             mqtt.connect();
+        } else {
+            mqtt.disconnect();
         }
     });
     mqtt.subscribe(&commandConsumer);

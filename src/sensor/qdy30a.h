@@ -18,7 +18,9 @@ public:
 private:
     void loadConstants();
     void calculateAbsorptionSpeed(float_t level, float_t volume);
+    void updateAbsorptionSpeed(float_t speed);
     void calculateIncomingSpeed(float_t level, float_t volume);
+    void updateIncomingSpeed(float_t speed);
 
 private:
     ModbusClient* _client = NULL;

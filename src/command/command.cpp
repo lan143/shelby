@@ -32,6 +32,11 @@ bool Command::unmarshalJSON(const char* data)
             _isEnabledStreetLight = root[F("streetLight")].as<std::string>() == "true";
         }
 
+        if (root.containsKey(F("decorativeLight"))) {
+            _hasDecorativeLight = true;
+            _isEnabledDecorativeLight = root[F("decorativeLight")].as<std::string>() == "true";
+        }
+
         return true;
     });
 }

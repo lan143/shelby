@@ -22,6 +22,9 @@ public:
     bool hasStreetLight() { return _hasStreetLight; }
     bool isEnabledStreetLight() { return _isEnabledStreetLight; }
 
+    bool hasDecorativeLight() { return _hasDecorativeLight; }
+    bool isEnabledDecorativeLight() { return _isEnabledDecorativeLight; }
+
 private:
     bool _hasGatesPayload = false;
     std::string _gatesPayload = "";
@@ -37,4 +40,7 @@ private:
 
     bool _hasStreetLight = false;
     bool _isEnabledStreetLight = false;
+
+    bool _hasDecorativeLight = false;
+    bool _isEnabledDecorativeLight = false;
 };
