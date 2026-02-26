@@ -57,7 +57,7 @@ void QDY30A::init(EDHA::Device* device, std::string stateTopic, uint8_t address,
 
 void QDY30A::loop()
 {
-    unsigned long currentTime = millis();
+    uint64_t currentTime = esp_timer_get_time();
 
     if (_nextUpdateTime < currentTime) {
         if (!_isLoaded) {
@@ -65,13 +65,13 @@ void QDY30A::loop()
         }
 
         if (!_isLoaded) {
-            _nextUpdateTime = currentTime + 1000;
+            _nextUpdateTime = currentTime + 1000000;
             return;
         }
 
         int32_t level = _client->holdingRegisterRead(_address, 0x0004);
         if (level == -1 || level == 0) {
-            _nextUpdateTime = currentTime + 5000;
+            _nextUpdateTime = currentTime + 5000000;
             return;
         }
 
@@ -114,11 +114,11 @@ void QDY30A::loop()
         _nextUpdateTime = currentTime + 60000;
     }
 
-    if ((_lastUpdateAbsorptionSpeedTime + 3600000) < millis()) { // set to zero every hour
+    if ((_lastUpdateAbsorptionSpeedTime + 3600000000) < esp_timer_get_time()) { // set to zero every hour
         updateAbsorptionSpeed(0);
     }
 
-    if ((_lastUpdateIncomingSpeedTime + 3600000) < millis()) { // set to zero every hour
+    if ((_lastUpdateIncomingSpeedTime + 3600000000) < esp_timer_get_time()) { // set to zero every hour
         updateIncomingSpeed(0);
     }
 }
@@ -138,7 +138,7 @@ void QDY30A::calculateAbsorptionSpeed(float_t level, float_t volume)
     float_t absorptionSpeed = 0.0f;
 
     if (volume < _lastVolume && level < 2.8) { // todo: move constant from level check to config
-        float_t dt = float_t(millis() - _lastChangeTime)/1000.0f;
+        float_t dt = float_t(esp_timer_get_time() - _lastChangeTime)/1000000.0f;
         float_t dv = _lastVolume - volume;
         absorptionSpeed = dv / dt;
         absorptionSpeed = absorptionSpeed * 1000 * 3600;
@@ -146,7 +146,7 @@ void QDY30A::calculateAbsorptionSpeed(float_t level, float_t volume)
     }
 
     _lastVolume = volume;
-    _lastChangeTime = millis();
+    _lastChangeTime = esp_timer_get_time();
 }
 
 void QDY30A::updateAbsorptionSpeed(float_t speed)
@@ -166,7 +166,7 @@ void QDY30A::updateAbsorptionSpeed(float_t speed)
     avgAbsorptionSpeed = float_t(uint32_t(avgAbsorptionSpeed*100.0f))/100.0f;
 
     _stateMgr->getState().setSepticAvgAbsorptionSpeed(avgAbsorptionSpeed);
-    _lastUpdateAbsorptionSpeedTime = millis();
+    _lastUpdateAbsorptionSpeedTime = esp_timer_get_time();
 }
 
 void QDY30A::calculateIncomingSpeed(float_t level, float_t volume)
@@ -174,7 +174,7 @@ void QDY30A::calculateIncomingSpeed(float_t level, float_t volume)
     float_t incomingSpeed = 0.0f;
 
     if (_lastIncomingVolume > 0.0f && volume > _lastIncomingVolume && level < 2.8) { // todo: move constant from level check to config
-        float_t dt = float_t(millis() - _lastIncomingChangeTime)/1000.0f;
+        float_t dt = float_t(esp_timer_get_time() - _lastIncomingChangeTime)/1000000.0f;
         float_t dv = volume - _lastIncomingVolume;
         incomingSpeed = dv / dt;
         incomingSpeed = incomingSpeed * 1000 * 3600;
@@ -182,7 +182,7 @@ void QDY30A::calculateIncomingSpeed(float_t level, float_t volume)
     }
 
     _lastIncomingVolume = volume;
-    _lastIncomingChangeTime = millis();
+    _lastIncomingChangeTime = esp_timer_get_time();
 }
 
 void QDY30A::updateIncomingSpeed(float_t speed)
@@ -202,5 +202,5 @@ void QDY30A::updateIncomingSpeed(float_t speed)
     avgIncomingSpeed = float_t(uint32_t(avgIncomingSpeed*100.0f))/100.0f;
 
     _stateMgr->getState().setSepticAvgIncomingSpeed(avgIncomingSpeed);
-    _lastUpdateIncomingSpeedTime = millis();
+    _lastUpdateIncomingSpeedTime = esp_timer_get_time();
 }

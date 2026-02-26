@@ -96,7 +96,7 @@ void Gates::doorChange(GatesCommand command)
 
 void Gates::loop()
 {
-    if (_lastRelayStateUpdateTime + 200 < millis()) {
+    if (_lastRelayStateUpdateTime + 200000 < esp_timer_get_time()) {
         switch (_state) {
             case GATES_RELAY_STATE_GATE_ON:
                 _gatesRelay->activate(true);
@@ -116,10 +116,10 @@ void Gates::loop()
                 break;
         }
 
-        _lastRelayStateUpdateTime = millis();
+        _lastRelayStateUpdateTime = esp_timer_get_time();
     }
 
-    if ((_lastMotorUpdateTime + 500) < millis()) {
+    if ((_lastMotorUpdateTime + 500000) < esp_timer_get_time()) {
         if (isMotorOpening()) {
             if (_gatesState == GATES_STATE_CLOSED
                 && _doorState == GATES_STATE_CLOSED) {
@@ -152,7 +152,7 @@ void Gates::loop()
             _isMotorClosing = false;
         }
 
-        _lastMotorUpdateTime = millis();
+        _lastMotorUpdateTime = esp_timer_get_time();
     }
 }
 

@@ -36,14 +36,14 @@ private:
     float_t _lastVolume = 0.0f;
     float_t _dspeed[DV_BUFFER_SIZE] = {0};
     uint8_t _dspeedIdx= 0;
-    unsigned long _lastChangeTime = 0;
-    unsigned long _lastUpdateAbsorptionSpeedTime = 0;
+    uint64_t _lastChangeTime = 0;
+    uint64_t _lastUpdateAbsorptionSpeedTime = 0;
 
     float_t _lastIncomingVolume = 0.0f;
     float_t _dIncomeSpeed[DV_BUFFER_SIZE] = {0};
     uint8_t _dIncomeSpeedIdx= 0;
-    unsigned long _lastIncomingChangeTime = 0;
-    unsigned long _lastUpdateIncomingSpeedTime = 0;
+    uint64_t _lastIncomingChangeTime = 0;
+    uint64_t _lastUpdateIncomingSpeedTime = 0;
 
-    unsigned long _nextUpdateTime = 0;
+   uint64_t _nextUpdateTime = 0;
 };

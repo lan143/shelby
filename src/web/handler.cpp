@@ -37,11 +37,11 @@ void Handler::init()
         AsyncResponseStream *response = request->beginResponseStream("application/json");
 
         std::string payload = EDUtils::buildJson([this](JsonObject entity) {
-            Config& config = _configMgr->getConfig();
+            auto config = _configMgr->getConfig();
 
-            entity["modbusSpeed"] = config.modbusSpeed;
-            entity["addressMR6C"] = config.addressMR6C;
-            entity["addressQDY30A"] = config.addressQDY30A;
+            entity["modbusSpeed"] = config->modbusSpeed;
+            entity["addressMR6C"] = config->addressMR6C;
+            entity["addressQDY30A"] = config->addressQDY30A;
         });
 
         response->write(payload.c_str());
@@ -104,14 +104,14 @@ void Handler::init()
             return;
         }
 
-        Config& config = _configMgr->getConfig();
-        if (modbusSpeed != config.modbusSpeed) {
+        auto config = _configMgr->getConfig();
+        if (modbusSpeed != config->modbusSpeed) {
             _modbus->changeSpeed(modbusSpeed);
         }
 
-        config.modbusSpeed = modbusSpeed;
-        config.addressMR6C = addressMR6C;
-        config.addressQDY30A = addressQDY30A;
+        config->modbusSpeed = modbusSpeed;
+        config->addressMR6C = addressMR6C;
+        config->addressQDY30A = addressQDY30A;
 
         _configMgr->store();
 
@@ -122,19 +122,19 @@ void Handler::init()
         AsyncResponseStream *response = request->beginResponseStream("application/json");
 
         std::string payload = EDUtils::buildJson([this](JsonObject entity) {
-            Config& config = _configMgr->getConfig();
+            auto config = _configMgr->getConfig();
 
-            entity["wifiSSID"] = config.wifiSSID;
-            entity["wifiPassword"] = config.wifiPassword;
-            entity["mqttHost"] = config.mqtt.host;
-            entity["mqttPort"] = config.mqtt.port;
-            entity["mqttLogin"] = config.mqtt.login;
-            entity["mqttPassword"] = config.mqtt.password;
-            entity["mqttIsHADiscovery"] = config.mqttIsHADiscovery;
-            entity["mqttHADiscoveryPrefix"] = config.mqttHADiscoveryPrefix;
-            entity["mqttCommandTopic"] = config.mqttCommandTopic;
-            entity["mqttStateTopic"] = config.mqttStateTopic;
-            entity["septicDiameter"] = config.septicDiameter;
+            entity["wifiSSID"] = config->networkConfig.wifiSSID;
+            entity["wifiPassword"] = config->networkConfig.wifiPassword;
+            entity["mqttHost"] = config->mqtt.host;
+            entity["mqttPort"] = config->mqtt.port;
+            entity["mqttLogin"] = config->mqtt.login;
+            entity["mqttPassword"] = config->mqtt.password;
+            entity["mqttIsHADiscovery"] = config->mqttIsHADiscovery;
+            entity["mqttHADiscoveryPrefix"] = config->mqttHADiscoveryPrefix;
+            entity["mqttCommandTopic"] = config->mqttCommandTopic;
+            entity["mqttStateTopic"] = config->mqttStateTopic;
+            entity["septicDiameter"] = config->septicDiameter;
         });
 
         response->write(payload.c_str());
@@ -160,10 +160,10 @@ void Handler::init()
             return;
         }
 
-        Config& config = _configMgr->getConfig();
-        std::strcpy(config.wifiSSID, wifiSSID->value().c_str());
-        std::strcpy(config.wifiPassword, wifiPassword->value().c_str());
-        config.isAPMode = false;
+        auto config = _configMgr->getConfig();
+        std::strcpy(config->networkConfig.wifiSSID, wifiSSID->value().c_str());
+        std::strcpy(config->networkConfig.wifiPassword, wifiPassword->value().c_str());
+        config->networkConfig.isAPMode = false;
 
         _configMgr->store();
 
@@ -182,7 +182,7 @@ void Handler::init()
             return;
         }
 
-        Config& config = _configMgr->getConfig();
+        auto config = _configMgr->getConfig();
         const AsyncWebParameter* host = request->getParam("host", true);
         const AsyncWebParameter* port = request->getParam("port", true);
         const AsyncWebParameter* login = request->getParam("login", true);
@@ -233,18 +233,18 @@ void Handler::init()
             return;
         }
 
-        strcpy(config.mqtt.host, host->value().c_str());
-        config.mqtt.port = (uint16_t)mqttPort;
-        strcpy(config.mqtt.login, login->value().c_str());
-        strcpy(config.mqtt.password, password->value().c_str());
-        strcpy(config.mqttHADiscoveryPrefix, haDiscoveryPrefix->value().c_str());
-        strcpy(config.mqttStateTopic, stateTopic->value().c_str());
-        strcpy(config.mqttCommandTopic, commandTopic->value().c_str());
+        strcpy(config->mqtt.host, host->value().c_str());
+        config->mqtt.port = (uint16_t)mqttPort;
+        strcpy(config->mqtt.login, login->value().c_str());
+        strcpy(config->mqtt.password, password->value().c_str());
+        strcpy(config->mqttHADiscoveryPrefix, haDiscoveryPrefix->value().c_str());
+        strcpy(config->mqttStateTopic, stateTopic->value().c_str());
+        strcpy(config->mqttCommandTopic, commandTopic->value().c_str());
 
         if (strcmp(ishaDiscoveryEnabled->value().c_str(), "true") == 0) {
-            config.mqttIsHADiscovery = true;
+            config->mqttIsHADiscovery = true;
         } else {
-            config.mqttIsHADiscovery = false;
+            config->mqttIsHADiscovery = false;
         }
 
         _configMgr->store();
@@ -258,7 +258,7 @@ void Handler::init()
             return;
         }
 
-        Config& config = _configMgr->getConfig();
+        auto config = _configMgr->getConfig();
         const AsyncWebParameter* septicDiameterParam = request->getParam("septicDiameter", true);
 
         float_t septicDiameter;
@@ -267,7 +267,7 @@ void Handler::init()
             return;
         }
 
-        config.septicDiameter = septicDiameter;
+        config->septicDiameter = septicDiameter;
         _configMgr->store();
 
         request->send(200, "application/json", "{}");
@@ -284,7 +284,7 @@ void Handler::init()
             }
 
             entity[F("freeHeap")] = ESP.getFreeHeap();
-            entity[F("uptime")] = millis() / 1000;
+            entity[F("uptime")] = esp_timer_get_time() / 1000000;
 
             esp_reset_reason_t reason = esp_reset_reason();
 
@@ -326,8 +326,6 @@ void Handler::init()
         });
         response->print(data.c_str());
         request->send(response);
-
-        millis();
     });
 
     _server->on("/api/reboot", HTTP_POST, [this](AsyncWebServerRequest *request) {

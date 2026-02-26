@@ -8,12 +8,12 @@
 #include <mqtt.h>
 #include <wirenboard.h>
 #include <state/state_mgr.h>
+#include <network/network.h>
 
 #include "defines.h"
 #include "config.h"
 #include "gates/gates.h"
 #include "command/command_consumer.h"
-#include "network/network.h"
 #include "relay/relay.h"
 #include "relay/wb_relay.h"
 #include "sensor/qdy30a.h"
@@ -22,9 +22,9 @@
 #include "web/handler.h"
 
 EDConfig::ConfigMgr<Config> configMgr(EEPROM_SIZE);
-NetworkMgr networkMgr(configMgr.getConfig(), true);
+EDNetwork::NetworkMgr networkMgr;
 EDHealthCheck::HealthCheck healthCheck;
-EDMQTT::MQTT mqtt(configMgr.getConfig().mqtt);
+EDMQTT::MQTT mqtt;
 EDHA::DiscoveryMgr discoveryMgr;
 Relay gatesRelay;
 Relay doorRelay;
@@ -48,30 +48,30 @@ void setup()
 
     SPIFFS.begin(true);
 
-    configMgr.setDefault([](Config& config) {
-        snprintf(config.wifiAPSSID, WIFI_SSID_LEN, "Shelby_%s", EDUtils::getMacAddress().c_str());
-        snprintf(config.mqttStateTopic, MQTT_TOPIC_LEN, "shelby/%s/state", EDUtils::getChipID());
-        snprintf(config.mqttCommandTopic, MQTT_TOPIC_LEN, "shelby/%s/set", EDUtils::getChipID());
-        snprintf(config.mqttHADiscoveryPrefix, MQTT_TOPIC_LEN, "homeassistant");
-        config.modbusSpeed = 9600;
-        config.addressQDY30A = 1;
-        config.addressMR6C = 2;
-        config.septicDiameter = 1.4f;
+    configMgr.setDefault([](Config* config) {
+        snprintf(config->networkConfig.wifiAPSSID, WIFI_SSID_LEN, "Shelby_%s", EDUtils::getMacAddress().c_str());
+        snprintf(config->mqttStateTopic, MQTT_TOPIC_LEN, "shelby/%s/state", EDUtils::getChipID());
+        snprintf(config->mqttCommandTopic, MQTT_TOPIC_LEN, "shelby/%s/set", EDUtils::getChipID());
+        snprintf(config->mqttHADiscoveryPrefix, MQTT_TOPIC_LEN, "homeassistant");
+        config->modbusSpeed = 9600;
+        config->addressQDY30A = 1;
+        config->addressMR6C = 2;
+        config->septicDiameter = 1.4f;
     });
     configMgr.load();
 
-    Serial2.begin(configMgr.getConfig().modbusSpeed, SERIAL_8N1, RS485RX, RS485TX);
+    Serial2.begin(configMgr.getConfig()->modbusSpeed, SERIAL_8N1, RS485RX, RS485TX);
     modbus.init(15);
 
-    networkMgr.init();
+    networkMgr.init(configMgr.getConfig()->networkConfig, true, ETH_ADDR, -1, ETH_MDC_PIN, ETH_MDIO_PIN, ETH_TYPE, ETH_CLK_MODE);
 
     ArduinoOTA.setPassword("somestrongpassword");
     ArduinoOTA.begin();
 
-    commandConsumer.init(configMgr.getConfig().mqttCommandTopic);
-    stateProducer.init(configMgr.getConfig().mqttStateTopic);
+    commandConsumer.init(configMgr.getConfig()->mqttCommandTopic);
+    stateProducer.init(configMgr.getConfig()->mqttStateTopic);
 
-    mqtt.init();
+    mqtt.init(configMgr.getConfig()->mqtt);
     networkMgr.OnConnect([&](bool isConnected) {
         if (isConnected) {
             mqtt.connect();
@@ -85,8 +85,8 @@ void setup()
     handler.init();
 
     discoveryMgr.init(
-        configMgr.getConfig().mqttHADiscoveryPrefix,
-        configMgr.getConfig().mqttIsHADiscovery,
+        configMgr.getConfig()->mqttHADiscoveryPrefix,
+        configMgr.getConfig()->mqttIsHADiscovery,
         [](std::string topicName, std::string payload) {
             return mqtt.publish(topicName.c_str(), payload.c_str(), true);
         }
@@ -101,11 +101,11 @@ void setup()
 
     gatesRelay.init(RELAY_GATE, false);
     doorRelay.init(RELAY_DRAWING, false);
-    gates.init(device, configMgr.getConfig().mqttStateTopic, configMgr.getConfig().mqttCommandTopic);
+    gates.init(device, configMgr.getConfig()->mqttStateTopic, configMgr.getConfig()->mqttCommandTopic);
 
-    wbRelay.init(device, configMgr.getConfig().mqttCommandTopic, configMgr.getConfig().mqttStateTopic, configMgr.getConfig().addressMR6C);
+    wbRelay.init(device, configMgr.getConfig()->mqttCommandTopic, configMgr.getConfig()->mqttStateTopic, configMgr.getConfig()->addressMR6C);
 
-    qdy30a.init(device, configMgr.getConfig().mqttStateTopic, configMgr.getConfig().addressQDY30A, configMgr.getConfig().septicDiameter);
+    qdy30a.init(device, configMgr.getConfig()->mqttStateTopic, configMgr.getConfig()->addressQDY30A, configMgr.getConfig()->septicDiameter);
 
     ESP_LOGI("setup", "complete");
 }
