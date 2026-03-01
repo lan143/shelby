@@ -111,7 +111,7 @@ void QDY30A::loop()
             }
         }
 
-        _nextUpdateTime = currentTime + 60000;
+        _nextUpdateTime = currentTime + 60000000;
     }
 
     if ((_lastUpdateAbsorptionSpeedTime + 3600000000) < esp_timer_get_time()) { // set to zero every hour
