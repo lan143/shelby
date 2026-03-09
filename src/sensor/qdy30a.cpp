@@ -1,4 +1,5 @@
 #include <math.h>
+#include <log/log.h>
 #include <Utils.h>
 #include "qdy30a.h"
 
@@ -16,8 +17,7 @@ void QDY30A::init(EDHA::Device* device, std::string stateTopic, uint8_t address,
     )
         ->setStateTopic(stateTopic)
         ->setValueTemplate("{{ value_json.septicFillingLevel }}")
-        ->setUnitOfMeasurement("m")
-        ->setDeviceClass("precipitation");
+        ->setUnitOfMeasurement("m");
 
     if (_septicDiameter != 0.0f) {
         _discoveryMgr->addSensor(
@@ -28,8 +28,8 @@ void QDY30A::init(EDHA::Device* device, std::string stateTopic, uint8_t address,
         )
             ->setStateTopic(stateTopic)
             ->setValueTemplate("{{ value_json.septicFillingVolume }}")
-            ->setUnitOfMeasurement("m3")
-            ->setDeviceClass("precipitation");
+            ->setUnitOfMeasurement("m³")
+            ->setDeviceClass("volume_storage");
 
         _discoveryMgr->addSensor(
             device,
@@ -39,8 +39,8 @@ void QDY30A::init(EDHA::Device* device, std::string stateTopic, uint8_t address,
         )
             ->setStateTopic(stateTopic)
             ->setValueTemplate("{{ value_json.septicAvgAbsorptionSpeed }}")
-            ->setUnitOfMeasurement("l/h")
-            ->setDeviceClass("precipitation");
+            ->setUnitOfMeasurement("L/h")
+            ->setDeviceClass("volume_flow_rate");
 
         _discoveryMgr->addSensor(
             device,
@@ -50,8 +50,8 @@ void QDY30A::init(EDHA::Device* device, std::string stateTopic, uint8_t address,
         )
             ->setStateTopic(stateTopic)
             ->setValueTemplate("{{ value_json.septicAvgIncomingSpeed }}")
-            ->setUnitOfMeasurement("l/h")
-            ->setDeviceClass("precipitation");
+            ->setUnitOfMeasurement("L/h")
+            ->setDeviceClass("volume_flow_rate");
     }
 }
 
@@ -65,12 +65,14 @@ void QDY30A::loop()
         }
 
         if (!_isLoaded) {
+            LOGE("QDY30A", "constants still not loaded. skip cycle.");
             _nextUpdateTime = currentTime + 1000000;
             return;
         }
 
         int32_t level = _client->holdingRegisterRead(_address, 0x0004);
         if (level == -1 || level == 0) {
+            LOGE("QDY30A", "failed to get current level");
             _nextUpdateTime = currentTime + 5000000;
             return;
         }
@@ -100,12 +102,24 @@ void QDY30A::loop()
         }
 
         convertLevel = float_t(uint32_t(convertLevel*1000.0f))/1000.0f;
+        if (convertLevel > 3.5f) {
+            LOGE("QDY30A", "level more that 3.5m - %fm. Skip.", convertLevel);
+            _nextUpdateTime = currentTime + 5000000;
+            return;
+        }
+
+        LOGD("QDY30A", "current level: %fm", convertLevel);
+
+        _lastCorrectSensorUpdateTime = esp_timer_get_time();
 
         if (_stateMgr->getState().getSepticFillingLevel() != convertLevel) {
             _stateMgr->getState().setSepticFillingLevel(float_t(uint32_t(convertLevel*1000.0f))/1000.0f);
+
             if (_septicDiameter != 0.0f) {
                 float_t volume = M_PI * pow(_septicDiameter / 2, 2) * convertLevel;
                 _stateMgr->getState().setSepticFillingVolume(float_t(uint32_t(volume*1000.0f))/1000.0f);
+                LOGD("QDY30A", "calculate volume: %fm3", volume);
+
                 calculateAbsorptionSpeed(convertLevel, volume);
                 calculateIncomingSpeed(convertLevel, volume);
             }
@@ -131,6 +145,8 @@ void QDY30A::loadConstants()
     if (_unitOfMeasurement != -1 && _dotPosition != -1) {
         _isLoaded = true;
     }
+
+    LOGD("QDY30A", "load constants: unitOfMeasurement: %d, dotPosition: %d", _unitOfMeasurement, _dotPosition);
 }
 
 void QDY30A::calculateAbsorptionSpeed(float_t level, float_t volume)
@@ -143,6 +159,8 @@ void QDY30A::calculateAbsorptionSpeed(float_t level, float_t volume)
         absorptionSpeed = dv / dt;
         absorptionSpeed = absorptionSpeed * 1000 * 3600;
         updateAbsorptionSpeed(absorptionSpeed);
+
+        LOGD("QDY30A", "calculate absorption speed. dt: %f, dv: %f, absorption speed: %f", dt, dv, absorptionSpeed);
     }
 
     _lastVolume = volume;

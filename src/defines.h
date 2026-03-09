@@ -10,7 +10,7 @@
 #define ETH_CLK_MODE    ETH_CLOCK_GPIO17_OUT
 
 #define RELAY_GATE      2
-#define RELAY_DRAWING   15
+#define RELAY_DOOR   15
 
 #define GATE_OPEN       36
 #define GATE_CLOSE      39

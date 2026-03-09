@@ -2,13 +2,13 @@
 #include <ArduinoOTA.h>
 #include <SPIFFS.h>
 #include <ConfigMgr.h>
-#include <esp_log.h>
 #include <discovery.h>
 #include <healthcheck.h>
 #include <mqtt.h>
 #include <wirenboard.h>
 #include <state/state_mgr.h>
 #include <network/network.h>
+#include <log/log.h>
 
 #include "defines.h"
 #include "config.h"
@@ -43,8 +43,10 @@ void setup()
 
     Serial.begin(SERIAL_SPEED);
 
-    ESP_LOGI("setup", "Shelby");
-    ESP_LOGI("setup", "start");
+    esp_log_level_set("*", ESP_LOG_VERBOSE);
+
+    LOGI("setup", "Shelby");
+    LOGI("setup", "start");
 
     SPIFFS.begin(true);
 
@@ -60,6 +62,14 @@ void setup()
     });
     configMgr.load();
 
+    // @todo: move to config
+    EDUtils::LogConfig networkConfig;
+    strcpy(networkConfig.host, "192.168.1.2");
+    networkConfig.port = 5555;
+    strcpy(networkConfig.uri, "/_bulk");
+
+    networkLogger.init(networkConfig, deviceName, EDUtils::formatString("Shelby_%s", EDUtils::getMacAddress().c_str()));
+
     Serial2.begin(configMgr.getConfig()->modbusSpeed, SERIAL_8N1, RS485RX, RS485TX);
     modbus.init(15);
 
@@ -73,6 +83,8 @@ void setup()
 
     mqtt.init(configMgr.getConfig()->mqtt);
     networkMgr.OnConnect([&](bool isConnected) {
+        networkLogger.enable(isConnected);
+
         if (isConnected) {
             mqtt.connect();
         } else {
@@ -100,14 +112,15 @@ void setup()
         ->setManufacturer(deviceManufacturer);
 
     gatesRelay.init(RELAY_GATE, false);
-    doorRelay.init(RELAY_DRAWING, false);
+    doorRelay.init(RELAY_DOOR, false);
     gates.init(device, configMgr.getConfig()->mqttStateTopic, configMgr.getConfig()->mqttCommandTopic);
 
     wbRelay.init(device, configMgr.getConfig()->mqttCommandTopic, configMgr.getConfig()->mqttStateTopic, configMgr.getConfig()->addressMR6C);
 
     qdy30a.init(device, configMgr.getConfig()->mqttStateTopic, configMgr.getConfig()->addressQDY30A, configMgr.getConfig()->septicDiameter);
+    healthCheck.registerService(&qdy30a);
 
-    ESP_LOGI("setup", "complete");
+    LOGI("setup", "complete");
 }
 
 void loop()
@@ -119,4 +132,5 @@ void loop()
     stateMgr.loop();
     healthCheck.loop();
     qdy30a.loop();
+    networkLogger.update();
 }
