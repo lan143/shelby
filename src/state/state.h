@@ -64,6 +64,9 @@ public:
         return !(*this == other);
     }
 
+    void changeGatesOpen(bool open) { _isGatesOpen = std::make_pair(open, true); }
+    bool isGatesOpen() const { return _isGatesOpen.first; }
+
     std::string marshalJSON();
 
 private:
@@ -77,4 +80,5 @@ private:
     float_t _septicFillingVolume = 0.0f;
     float_t _septicAvgAbsorptionSpeed = 0.0f;
     float_t _septicAvgIncomingSpeed = 0.0f;
+    std::pair<bool, bool> _isGatesOpen;
 };

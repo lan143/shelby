@@ -96,7 +96,7 @@ void Gates::doorChange(GatesCommand command)
 
 void Gates::loop()
 {
-    if (_lastRelayStateUpdateTime + 200000 < esp_timer_get_time()) {
+    if ((_lastRelayStateUpdateTime + 200000) < esp_timer_get_time()) { // every 0.2 second
         switch (_state) {
             case GATES_RELAY_STATE_GATE_ON:
                 _gatesRelay->activate(true);
@@ -119,7 +119,7 @@ void Gates::loop()
         _lastRelayStateUpdateTime = esp_timer_get_time();
     }
 
-    if ((_lastMotorUpdateTime + 500000) < esp_timer_get_time()) {
+    if ((_lastMotorUpdateTime + 500000) < esp_timer_get_time()) { // every 0.5 second
         if (isMotorOpening()) {
             if (_gatesState == GATES_STATE_CLOSED
                 && _doorState == GATES_STATE_CLOSED) {
@@ -127,7 +127,7 @@ void Gates::loop()
             }
 
             _isMotorOpening = true;
-        } else if (_isMotorOpening) {
+        } else if (_isMotorOpening && _stateMgr->getState().isGatesOpen()) {
             if (_gatesState == GATES_STATE_OPENING) {
                 gatesStateUpdate(GATES_STATE_OPENED);
             } else if (_doorState == GATES_STATE_OPENING) {
@@ -145,7 +145,7 @@ void Gates::loop()
             }
 
             _isMotorClosing = true;
-        } else if (_isMotorClosing) {
+        } else if (_isMotorClosing && !_stateMgr->getState().isGatesOpen()) {
             gatesStateUpdate(GATES_STATE_CLOSED);
             doorStateUpdate(GATES_STATE_CLOSED);
 
@@ -172,17 +172,11 @@ bool Gates::skipCommand(GatesState state, GatesCommand command)
 {
     switch (command) {
         case GATES_COMMAND_OPEN:
-            if (state == GATES_STATE_CLOSED) {
-                return false;
-            }
+            return state != GATES_STATE_CLOSED;
         case GATES_COMMAND_CLOSE:
-            if (state == GATES_STATE_OPENED) {
-                return false;
-            }
+            return state != GATES_STATE_OPENED;
         case GATES_COMMAND_STOP:
-            if (state == GATES_STATE_OPENING || GATES_STATE_CLOSING) {
-                return false;
-            }
+            return state != GATES_STATE_OPENING && state != GATES_STATE_CLOSING;
     }
 
     return true;

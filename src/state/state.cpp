@@ -14,7 +14,8 @@ bool State::operator==(State& other)
         && (*this)._septicFillingLevel == other._septicFillingLevel
         && (*this)._septicFillingVolume == other._septicFillingVolume
         && (*this)._septicAvgAbsorptionSpeed == other._septicAvgAbsorptionSpeed
-        && (*this)._septicAvgIncomingSpeed == other._septicAvgIncomingSpeed;
+        && (*this)._septicAvgIncomingSpeed == other._septicAvgIncomingSpeed
+        && (*this)._isGatesOpen == other._isGatesOpen;
 }
 
 std::string State::marshalJSON()
@@ -84,6 +85,10 @@ std::string State::marshalJSON()
 
         entity[F("septicAvgAbsorptionSpeed")] = _septicAvgAbsorptionSpeed;
         entity[F("septicAvgIncomingSpeed")] = _septicAvgIncomingSpeed;
+
+        if (_isGatesOpen.second) {
+            entity[F("isGatesOpen")] = _isGatesOpen.first ? "true" : "false";
+        }
     });
 
     return payload;

@@ -7,25 +7,22 @@
 
 #include "state/state.h"
 
-class WbRelay
+class BinarySensor
 {
 public:
-    WbRelay(
+    BinarySensor(
         EDHA::DiscoveryMgr* discoveryMgr,
         EDUtils::StateMgr<State>* stateMgr,
         EDWB::MR6C* mr6cDevice
     ) : _discoveryMgr(discoveryMgr), _stateMgr(stateMgr), _mr6cDevice(mr6cDevice) {}
 
-    void init(EDHA::Device* device, std::string commandTopic, std::string stateTopic);
-
-    void wateringLawnChangeState(bool enabled);
-
-    void parkingLightChangeState(bool enabled);
-    void streetLightChangeState(bool enabled);
-    void decorativeLightChangeState(bool enabled);
+    void init(EDHA::Device* device, std::string stateTopic);
+    void update();
 
 private:
     EDHA::DiscoveryMgr* _discoveryMgr = NULL;
     EDUtils::StateMgr<State>* _stateMgr = NULL;
     EDWB::MR6C* _mr6cDevice = NULL;
+
+    uint64_t _lastUpdateTime = 0;
 };

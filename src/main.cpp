@@ -16,6 +16,7 @@
 #include "command/command_consumer.h"
 #include "relay/relay.h"
 #include "relay/wb_relay.h"
+#include "sensor/binary_sensor.h"
 #include "sensor/qdy30a.h"
 #include "state/state.h"
 #include "state/producer.h"
@@ -32,9 +33,10 @@ StateProducer stateProducer(&mqtt);
 EDUtils::StateMgr<State> stateMgr(&stateProducer);
 Gates gates(&gatesRelay, &doorRelay, &stateMgr, &discoveryMgr);
 EDWB::WirenBoard modbus(Serial2);
-WbRelay wbRelay(&discoveryMgr, &stateMgr, &modbus);
-CommandConsumer commandConsumer(&gates, &wbRelay);
+WbRelay* wbRelay;
+CommandConsumer* commandConsumer;
 Handler handler(&configMgr, &networkMgr, &healthCheck, &modbus);
+BinarySensor* binarySensor;
 QDY30A qdy30a(modbus.getClient(), &discoveryMgr, &stateMgr);
 
 void setup()
@@ -78,7 +80,6 @@ void setup()
     ArduinoOTA.setPassword("somestrongpassword");
     ArduinoOTA.begin();
 
-    commandConsumer.init(configMgr.getConfig()->mqttCommandTopic);
     stateProducer.init(configMgr.getConfig()->mqttStateTopic);
 
     mqtt.init(configMgr.getConfig()->mqtt);
@@ -91,7 +92,6 @@ void setup()
             mqtt.disconnect();
         }
     });
-    mqtt.subscribe(&commandConsumer);
     healthCheck.registerService(&mqtt);
 
     handler.init();
@@ -115,7 +115,16 @@ void setup()
     doorRelay.init(RELAY_DOOR, false);
     gates.init(device, configMgr.getConfig()->mqttStateTopic, configMgr.getConfig()->mqttCommandTopic);
 
-    wbRelay.init(device, configMgr.getConfig()->mqttCommandTopic, configMgr.getConfig()->mqttStateTopic, configMgr.getConfig()->addressMR6C);
+    EDWB::MR6C* mr6c = modbus.addMR6C(configMgr.getConfig()->addressMR6C);
+    wbRelay = new WbRelay(&discoveryMgr, &stateMgr, mr6c);
+    wbRelay->init(device, configMgr.getConfig()->mqttCommandTopic, configMgr.getConfig()->mqttStateTopic);
+
+    binarySensor = new BinarySensor(&discoveryMgr, &stateMgr, mr6c);
+    binarySensor->init(device, configMgr.getConfig()->mqttStateTopic);
+
+    commandConsumer = new CommandConsumer(&gates, wbRelay);
+    commandConsumer->init(configMgr.getConfig()->mqttCommandTopic);
+    mqtt.subscribe(commandConsumer);
 
     qdy30a.init(device, configMgr.getConfig()->mqttStateTopic, configMgr.getConfig()->addressQDY30A, configMgr.getConfig()->septicDiameter);
     healthCheck.registerService(&qdy30a);
@@ -133,4 +142,5 @@ void loop()
     healthCheck.loop();
     qdy30a.loop();
     networkLogger.update();
+    binarySensor->update();
 }

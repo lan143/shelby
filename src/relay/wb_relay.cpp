@@ -1,10 +1,9 @@
 #include <Utils.h>
 #include "wb_relay.h"
 
-void WbRelay::init(EDHA::Device* device, std::string commandTopic, std::string stateTopic, uint8_t address)
+void WbRelay::init(EDHA::Device* device, std::string commandTopic, std::string stateTopic)
 {
     const char* chipID = EDUtils::getChipID();
-    _mr6cDevice = _modbus->addMR6C(address);
 
     _discoveryMgr->addSwitch(
         device,
