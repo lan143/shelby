@@ -43,7 +43,6 @@ private:
 
     bool isMotorOpening();
     bool isMotorClosing();
-    int getPinState(int pin);
 
 private:
     Relay* _gatesRelay;
@@ -56,6 +55,9 @@ private:
     uint64_t _lastMotorUpdateTime = 0;
     bool _isMotorOpening = false;
     bool _isMotorClosing = false;
+    int8_t _openMeasurements = 0;
+    int8_t _closeMeasurements = 0;
+    uint64_t _lastUpdateMeasurementsTime = 0;
 
     GatesRelayState _state = GATES_RELAY_STATE_IDLE;
     uint64_t _lastRelayStateUpdateTime = 0;

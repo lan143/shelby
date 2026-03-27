@@ -135,9 +135,7 @@ void Gates::loop()
             }
 
             _isMotorOpening = false;
-        }
-
-        if (isMotorClosing()) {
+        } else if (isMotorClosing()) {
             if (_gatesState == GATES_STATE_OPENED) {
                 gatesStateUpdate(GATES_STATE_CLOSING);
             } else if (_doorState == GATES_STATE_OPENED) {
@@ -153,6 +151,16 @@ void Gates::loop()
         }
 
         _lastMotorUpdateTime = esp_timer_get_time();
+    }
+
+    if ((_lastUpdateMeasurementsTime + 1000) < esp_timer_get_time()) { // every 0.001 second
+        _openMeasurements += digitalRead(GATE_OPEN) == 0 ? 1 : -1;
+        _openMeasurements = constrain(_openMeasurements, 0, 50);
+
+        _closeMeasurements += digitalRead(GATE_CLOSE) == 0 ? 1 : -1;
+        _closeMeasurements = constrain(_closeMeasurements, 0, 50);
+
+        _lastUpdateMeasurementsTime = esp_timer_get_time();
     }
 }
 
@@ -184,22 +192,10 @@ bool Gates::skipCommand(GatesState state, GatesCommand command)
 
 bool Gates::isMotorOpening()
 {
-    return getPinState(GATE_OPEN) == 0;
+    return _openMeasurements > 25;
 }
 
 bool Gates::isMotorClosing()
 {
-    return getPinState(GATE_CLOSE) == 0;
-}
-
-int Gates::getPinState(int pin)
-{
-    int measurements = 0;
-
-    for (int i = 0; i < 10; i++) {
-        measurements += digitalRead(pin);
-        delayMicroseconds(10);
-    }
-
-    return measurements > 5 ? 1 : 0;
+    return _closeMeasurements > 25;
 }
