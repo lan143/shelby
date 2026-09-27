@@ -143,4 +143,5 @@ void loop()
     qdy30a.loop();
     networkLogger.update();
     binarySensor->update();
+    wbRelay->update();
 }

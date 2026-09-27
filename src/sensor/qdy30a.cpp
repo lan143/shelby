@@ -128,11 +128,11 @@ void QDY30A::loop()
         _nextUpdateTime = currentTime + 60000000;
     }
 
-    if ((_lastUpdateAbsorptionSpeedTime + 3600000000) < esp_timer_get_time()) { // set to zero every hour
+    if ((_lastUpdateAbsorptionSpeedTime + 300000000) < esp_timer_get_time()) { // set to zero every 5 minutes
         updateAbsorptionSpeed(0);
     }
 
-    if ((_lastUpdateIncomingSpeedTime + 3600000000) < esp_timer_get_time()) { // set to zero every hour
+    if ((_lastUpdateIncomingSpeedTime + 300000000) < esp_timer_get_time()) { // set to zero every 5 minutes
         updateIncomingSpeed(0);
     }
 }

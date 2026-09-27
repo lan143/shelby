@@ -5,6 +5,13 @@ void WbRelay::init(EDHA::Device* device, std::string commandTopic, std::string s
 {
     const char* chipID = EDUtils::getChipID();
 
+    _mr6cDevice->setInputMode(0, EDWB::MR6C_INPUT_MODE_FREQUENCY);
+    _mr6cDevice->setInputMode(1, EDWB::MR6C_INPUT_MODE_FREQUENCY);
+    _mr6cDevice->setInputMode(2, EDWB::MR6C_INPUT_MODE_FREQUENCY);
+    _mr6cDevice->setInputMode(3, EDWB::MR6C_INPUT_MODE_FREQUENCY);
+    _mr6cDevice->setInputMode(4, EDWB::MR6C_INPUT_MODE_FREQUENCY);
+    _mr6cDevice->setInputMode(6, EDWB::MR6C_INPUT_MODE_FREQUENCY);
+
     _discoveryMgr->addSwitch(
         device,
         "Watering the lawn",
@@ -66,10 +73,30 @@ void WbRelay::init(EDHA::Device* device, std::string commandTopic, std::string s
         ->setStateOff("false");
 }
 
+void WbRelay::update()
+{
+    if (_stateMgr->getState().isWateringLawnEnabled() && (_lastWateringLawnEnableTime + 1200000000) < esp_timer_get_time()) {
+        wateringLawnChangeState(false);
+    }
+
+    if ((_lastCheckTime + 1000000) < esp_timer_get_time()) {
+        auto wateringLawnState = _mr6cDevice->getRelayChannelState(1);
+        if (wateringLawnState.second && wateringLawnState.first != _stateMgr->getState().isWateringLawnEnabled()) {
+            _mr6cDevice->setRelayChannelState(1, _stateMgr->getState().isWateringLawnEnabled());
+        }
+
+        _lastCheckTime = esp_timer_get_time();
+    }
+}
+
 void WbRelay::wateringLawnChangeState(bool enabled)
 {
     _mr6cDevice->setRelayChannelState(1, enabled);
     _stateMgr->getState().setWateringLawnState(enabled);
+
+    if (enabled) {
+        _lastWateringLawnEnableTime = esp_timer_get_time();
+    }
 }
 
 void WbRelay::parkingLightChangeState(bool enabled)

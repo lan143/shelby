@@ -17,6 +17,7 @@ public:
     ) : _discoveryMgr(discoveryMgr), _stateMgr(stateMgr), _mr6cDevice(mr6cDevice) {}
 
     void init(EDHA::Device* device, std::string commandTopic, std::string stateTopic);
+    void update();
 
     void wateringLawnChangeState(bool enabled);
 
@@ -28,4 +29,8 @@ private:
     EDHA::DiscoveryMgr* _discoveryMgr = NULL;
     EDUtils::StateMgr<State>* _stateMgr = NULL;
     EDWB::MR6C* _mr6cDevice = NULL;
+
+private:
+    int64_t _lastWateringLawnEnableTime = 0;
+    int64_t _lastCheckTime = 0;
 };

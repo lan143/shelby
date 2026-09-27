@@ -66,6 +66,7 @@ public:
 
     void changeGatesOpen(bool open) { _isGatesOpen = std::make_pair(open, true); }
     bool isGatesOpen() const { return _isGatesOpen.first; }
+    bool isWateringLawnEnabled() const { return _isWateringLawnEnabled; }
 
     std::string marshalJSON();
 
