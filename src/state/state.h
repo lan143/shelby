@@ -16,48 +16,6 @@ public:
         _doorState = doorState;
     }
 
-    void setWateringLawnState(bool enabled)
-    {
-        _isWateringLawnEnabled = enabled;
-    }
-
-    void setParkingLightState(bool enabled)
-    {
-        _isParkingLightEnabled = enabled;
-    }
-
-    void setStreetLightState(bool enabled)
-    {
-        _isStreetLightEnabled = enabled;
-    }
-
-    void setDecorativeLightState(bool enabled)
-    {
-        _isDecorativeLightEnabled = enabled;
-    }
-
-    void setSepticFillingLevel(float_t level)
-    {
-        _septicFillingLevel = level;
-    }
-
-    float_t getSepticFillingLevel() const { return _septicFillingLevel; }
-
-    void setSepticFillingVolume(float_t volume)
-    {
-        _septicFillingVolume = volume;
-    }
-
-    void setSepticAvgAbsorptionSpeed(float_t speed)
-    {
-        _septicAvgAbsorptionSpeed = speed;
-    }
-
-    void setSepticAvgIncomingSpeed(float_t speed)
-    {
-        _septicAvgIncomingSpeed = speed;
-    }
-
     bool operator==(State& other);
     bool operator!=(State& other)
     {
@@ -66,20 +24,11 @@ public:
 
     void changeGatesOpen(bool open) { _isGatesOpen = std::make_pair(open, true); }
     bool isGatesOpen() const { return _isGatesOpen.first; }
-    bool isWateringLawnEnabled() const { return _isWateringLawnEnabled; }
 
     std::string marshalJSON();
 
 private:
     GatesState _gatesState = GATES_STATE_CLOSED;
     GatesState _doorState = GATES_STATE_CLOSED;
-    bool _isWateringLawnEnabled = false;
-    bool _isParkingLightEnabled = false;
-    bool _isStreetLightEnabled = false;
-    bool _isDecorativeLightEnabled = false;
-    float_t _septicFillingLevel = 0.0f;
-    float_t _septicFillingVolume = 0.0f;
-    float_t _septicAvgAbsorptionSpeed = 0.0f;
-    float_t _septicAvgIncomingSpeed = 0.0f;
     std::pair<bool, bool> _isGatesOpen;
 };

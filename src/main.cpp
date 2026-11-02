@@ -9,6 +9,7 @@
 #include <discovery.h>
 #include <healthcheck.h>
 #include <mqtt.h>
+#include <relay/wb_mr6c.h>
 #include <wirenboard.h>
 #include <state/state_mgr.h>
 #include <network/network.h>
@@ -19,9 +20,8 @@
 #include "gates/gates.h"
 #include "command/command_consumer.h"
 #include "relay/relay.h"
-#include "relay/wb_relay.h"
-#include "sensor/binary_sensor.h"
-#include "sensor/qdy30a.h"
+#include "sensor/gates_open_sensor.h"
+#include "septic/septic.h"
 #include "state/state.h"
 #include "state/producer.h"
 #include "web/handler.h"
@@ -37,11 +37,14 @@ StateProducer stateProducer(&mqtt);
 EDUtils::StateMgr<State> stateMgr(&stateProducer);
 Gates gates(&gatesRelay, &doorRelay, &stateMgr, &discoveryMgr);
 EDWB::WirenBoard modbus(Serial2);
-WbRelay* wbRelay;
+EDCommon::Relay::WBMR6C* lawnWateringRelay;
+EDCommon::Relay::WBMR6C* decorativeRelay;
+EDCommon::Relay::WBMR6C* parkingRelay;
+EDCommon::Relay::WBMR6C* streetRelay;
+GatesOpenSensor* gatesOpenSensor;
+Septic* septic;
 CommandConsumer* commandConsumer;
 Handler handler(&configMgr, &networkMgr, &healthCheck, &modbus);
-BinarySensor* binarySensor;
-QDY30A qdy30a(modbus.getClient(), &discoveryMgr, &stateMgr);
 
 // Validates the persisted v2 blob with the same CRC16 used by EDConfig::DataMgr.
 static uint16_t calculateLegacyConfigChecksum(const ConfigLegacyV2* data)
@@ -208,18 +211,61 @@ void setup()
     gates.init(device, stateTopic, commandTopic);
 
     EDWB::MR6C* mr6c = modbus.addMR6C(configMgr.getData()->addressMR6C);
-    wbRelay = new WbRelay(&discoveryMgr, &stateMgr, mr6c);
-    wbRelay->init(device, commandTopic, stateTopic);
 
-    binarySensor = new BinarySensor(&discoveryMgr, &stateMgr, mr6c);
-    binarySensor->init(device, stateTopic);
+    // Input 1 is owned by the EDCommon binary sensor, which sets its own mode.
+    const uint8_t frequencyInputs[] = {0, 2, 3, 4, 6};
+    for (uint8_t input : frequencyInputs) {
+        if (!mr6c->setInputMode(input, EDWB::MR6C_INPUT_MODE_FREQUENCY)) {
+            LOGE("setup", "failed to set MR6C input %d to frequency mode", input);
+        }
+    }
 
-    commandConsumer = new CommandConsumer(&gates, wbRelay);
+    lawnWateringRelay = new EDCommon::Relay::WBMR6C(mr6c);
+    lawnWateringRelay->init(1, -1, {
+        EDCommon::Relay::withMQTT(&mqtt, configMgr.getData()->mqttTopicPrefix, "shelby", "Watering the lawn"),
+        EDCommon::Relay::withDiscovery(&discoveryMgr, device),
+        EDCommon::Relay::withTimeout(1200000000),
+    });
+
+    decorativeRelay = new EDCommon::Relay::WBMR6C(mr6c);
+    decorativeRelay->init(4, -1, {
+        EDCommon::Relay::withMQTT(&mqtt, configMgr.getData()->mqttTopicPrefix, "shelby", "Decorative light"),
+        EDCommon::Relay::withDiscovery(&discoveryMgr, device),
+    });
+
+    parkingRelay = new EDCommon::Relay::WBMR6C(mr6c);
+    parkingRelay->init(5, -1, {
+        EDCommon::Relay::withMQTT(&mqtt, configMgr.getData()->mqttTopicPrefix, "shelby", "Parking space light"),
+        EDCommon::Relay::withDiscovery(&discoveryMgr, device),
+    });
+
+    streetRelay = new EDCommon::Relay::WBMR6C(mr6c);
+    streetRelay->init(6, -1, {
+        EDCommon::Relay::withMQTT(&mqtt, configMgr.getData()->mqttTopicPrefix, "shelby", "Street light"),
+        EDCommon::Relay::withDiscovery(&discoveryMgr, device),
+    });
+
+    gatesOpenSensor = new GatesOpenSensor(&stateMgr, mr6c);
+    gatesOpenSensor->init(500, {
+        EDCommon::BinarySensor::withMQTT(&mqtt, configMgr.getData()->mqttTopicPrefix, "shelby", "Gates open"),
+        EDCommon::BinarySensor::withDiscovery(&discoveryMgr, device),
+    });
+
+    commandConsumer = new CommandConsumer(&gates);
     commandConsumer->init(commandTopic);
     mqtt.subscribe(commandConsumer);
 
-    qdy30a.init(device, stateTopic, configMgr.getData()->addressQDY30A, configMgr.getData()->septicDiameter);
-    healthCheck.registerService(&qdy30a);
+    septic = new Septic(
+        modbus.addQDY30A(configMgr.getData()->addressQDY30A),
+        configMgr.getData()->septicDiameter
+    );
+    septic->init(
+        &discoveryMgr,
+        device,
+        &mqtt,
+        configMgr.getData()->mqttTopicPrefix
+    );
+    healthCheck.registerService(septic);
 
     LOGI("setup", "complete");
 }
@@ -232,8 +278,11 @@ void loop()
     gates.loop();
     stateMgr.loop();
     healthCheck.loop();
-    qdy30a.loop();
+    septic->update();
     networkLogger.update();
-    binarySensor->update();
-    wbRelay->update();
+    gatesOpenSensor->update();
+    lawnWateringRelay->update();
+    decorativeRelay->update();
+    parkingRelay->update();
+    streetRelay->update();
 }
