@@ -37,7 +37,7 @@ void Handler::init()
         AsyncResponseStream *response = request->beginResponseStream("application/json");
 
         std::string payload = EDUtils::buildJson([this](JsonObject entity) {
-            auto config = _configMgr->getConfig();
+            auto config = _configMgr->getData();
 
             entity["modbusSpeed"] = config->modbusSpeed;
             entity["addressMR6C"] = config->addressMR6C;
@@ -104,7 +104,7 @@ void Handler::init()
             return;
         }
 
-        auto config = _configMgr->getConfig();
+        auto config = _configMgr->getData();
         if (modbusSpeed != config->modbusSpeed) {
             _modbus->changeSpeed(modbusSpeed);
         }
@@ -122,7 +122,7 @@ void Handler::init()
         AsyncResponseStream *response = request->beginResponseStream("application/json");
 
         std::string payload = EDUtils::buildJson([this](JsonObject entity) {
-            auto config = _configMgr->getConfig();
+            auto config = _configMgr->getData();
 
             entity["wifiSSID"] = config->networkConfig.wifiSSID;
             entity["wifiPassword"] = config->networkConfig.wifiPassword;
@@ -160,7 +160,7 @@ void Handler::init()
             return;
         }
 
-        auto config = _configMgr->getConfig();
+        auto config = _configMgr->getData();
         std::strcpy(config->networkConfig.wifiSSID, wifiSSID->value().c_str());
         std::strcpy(config->networkConfig.wifiPassword, wifiPassword->value().c_str());
         config->networkConfig.isAPMode = false;
@@ -182,7 +182,7 @@ void Handler::init()
             return;
         }
 
-        auto config = _configMgr->getConfig();
+        auto config = _configMgr->getData();
         const AsyncWebParameter* host = request->getParam("host", true);
         const AsyncWebParameter* port = request->getParam("port", true);
         const AsyncWebParameter* login = request->getParam("login", true);
@@ -258,7 +258,7 @@ void Handler::init()
             return;
         }
 
-        auto config = _configMgr->getConfig();
+        auto config = _configMgr->getData();
         const AsyncWebParameter* septicDiameterParam = request->getParam("septicDiameter", true);
 
         float_t septicDiameter;

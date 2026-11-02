@@ -7,16 +7,6 @@
 
 #define CURRENT_VERSION 2
 
-#define WIFI_SSID_LEN 32 + 1
-#define WIFI_PWD_LEN 64 + 1
-
-#define HOST_LEN 64
-#define MQTT_DEFAULT_PORT 1883
-
-#define MQTT_LOGIN_LEN 32
-#define MQTT_PASSWORD_LEN 32
-#define MQTT_TOPIC_LEN 64
-
 struct Config
 {
     uint8_t version = CURRENT_VERSION;

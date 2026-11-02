@@ -1,7 +1,8 @@
 #include <Arduino.h>
 #include <ArduinoOTA.h>
 #include <SPIFFS.h>
-#include <ConfigMgr.h>
+#include <data_mgr.h>
+#include <storage/eeprom_storage.hpp>
 #include <discovery.h>
 #include <healthcheck.h>
 #include <mqtt.h>
@@ -22,7 +23,7 @@
 #include "state/producer.h"
 #include "web/handler.h"
 
-EDConfig::ConfigMgr<Config> configMgr(EEPROM_SIZE);
+EDConfig::DataMgr<Config> configMgr(new EDConfig::StorageEEPROM<Config>(EEPROM_SIZE));
 EDNetwork::NetworkMgr networkMgr;
 EDHealthCheck::HealthCheck healthCheck;
 EDMQTT::MQTT mqtt;
@@ -72,17 +73,17 @@ void setup()
 
     networkLogger.init(networkConfig, deviceName, EDUtils::formatString("Shelby_%s", EDUtils::getMacAddress().c_str()));
 
-    Serial2.begin(configMgr.getConfig()->modbusSpeed, SERIAL_8N1, RS485RX, RS485TX);
+    Serial2.begin(configMgr.getData()->modbusSpeed, SERIAL_8N1, RS485RX, RS485TX);
     modbus.init(15);
 
-    networkMgr.init(configMgr.getConfig()->networkConfig, true, ETH_ADDR, -1, ETH_MDC_PIN, ETH_MDIO_PIN, ETH_TYPE, ETH_CLK_MODE);
+    networkMgr.init(configMgr.getData()->networkConfig, true, ETH_ADDR, -1, ETH_MDC_PIN, ETH_MDIO_PIN, ETH_TYPE, ETH_CLK_MODE);
 
     ArduinoOTA.setPassword("somestrongpassword");
     ArduinoOTA.begin();
 
-    stateProducer.init(configMgr.getConfig()->mqttStateTopic);
+    stateProducer.init(configMgr.getData()->mqttStateTopic);
 
-    mqtt.init(configMgr.getConfig()->mqtt);
+    mqtt.init(configMgr.getData()->mqtt);
     networkMgr.OnConnect([&](bool isConnected) {
         networkLogger.enable(isConnected);
 
@@ -97,8 +98,8 @@ void setup()
     handler.init();
 
     discoveryMgr.init(
-        configMgr.getConfig()->mqttHADiscoveryPrefix,
-        configMgr.getConfig()->mqttIsHADiscovery,
+        configMgr.getData()->mqttHADiscoveryPrefix,
+        configMgr.getData()->mqttIsHADiscovery,
         [](std::string topicName, std::string payload) {
             return mqtt.publish(topicName.c_str(), payload.c_str(), true);
         }
@@ -113,20 +114,20 @@ void setup()
 
     gatesRelay.init(RELAY_GATE, false);
     doorRelay.init(RELAY_DOOR, false);
-    gates.init(device, configMgr.getConfig()->mqttStateTopic, configMgr.getConfig()->mqttCommandTopic);
+    gates.init(device, configMgr.getData()->mqttStateTopic, configMgr.getData()->mqttCommandTopic);
 
-    EDWB::MR6C* mr6c = modbus.addMR6C(configMgr.getConfig()->addressMR6C);
+    EDWB::MR6C* mr6c = modbus.addMR6C(configMgr.getData()->addressMR6C);
     wbRelay = new WbRelay(&discoveryMgr, &stateMgr, mr6c);
-    wbRelay->init(device, configMgr.getConfig()->mqttCommandTopic, configMgr.getConfig()->mqttStateTopic);
+    wbRelay->init(device, configMgr.getData()->mqttCommandTopic, configMgr.getData()->mqttStateTopic);
 
     binarySensor = new BinarySensor(&discoveryMgr, &stateMgr, mr6c);
-    binarySensor->init(device, configMgr.getConfig()->mqttStateTopic);
+    binarySensor->init(device, configMgr.getData()->mqttStateTopic);
 
     commandConsumer = new CommandConsumer(&gates, wbRelay);
-    commandConsumer->init(configMgr.getConfig()->mqttCommandTopic);
+    commandConsumer->init(configMgr.getData()->mqttCommandTopic);
     mqtt.subscribe(commandConsumer);
 
-    qdy30a.init(device, configMgr.getConfig()->mqttStateTopic, configMgr.getConfig()->addressQDY30A, configMgr.getConfig()->septicDiameter);
+    qdy30a.init(device, configMgr.getData()->mqttStateTopic, configMgr.getData()->addressQDY30A, configMgr.getData()->septicDiameter);
     healthCheck.registerService(&qdy30a);
 
     LOGI("setup", "complete");

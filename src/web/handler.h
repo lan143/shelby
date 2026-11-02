@@ -7,7 +7,7 @@
 #endif
 
 #include <ESPAsyncWebServer.h>
-#include <ConfigMgr.h>
+#include <data_mgr.h>
 #include <healthcheck.h>
 #include <network/network.h>
 #include <wirenboard.h>
@@ -17,7 +17,7 @@
 class Handler {
 public:
     Handler(
-        EDConfig::ConfigMgr<Config>* configMgr,
+        EDConfig::DataMgr<Config>* configMgr,
         EDNetwork::NetworkMgr* networkMgr,
         EDHealthCheck::HealthCheck* healthCheck,
         EDWB::WirenBoard* modbus
@@ -29,7 +29,7 @@ public:
 
 private:
     AsyncWebServer* _server;
-    EDConfig::ConfigMgr<Config>* _configMgr;
+    EDConfig::DataMgr<Config>* _configMgr;
     EDNetwork::NetworkMgr* _networkMgr;
     EDHealthCheck::HealthCheck* _healthCheck;
     EDWB::WirenBoard* _modbus;
