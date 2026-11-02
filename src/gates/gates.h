@@ -50,6 +50,9 @@ public:
     const std::string& gatesCommandTopic() const { return _gatesCommandTopic; }
     const std::string& doorCommandTopic() const { return _doorCommandTopic; }
 
+    GatesState gatesState() const { return _gatesState; }
+    GatesState doorState() const { return _doorState; }
+
 private:
     void gatesStateUpdate(GatesState newState);
     void doorStateUpdate(GatesState newState);

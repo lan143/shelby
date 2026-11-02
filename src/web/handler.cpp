@@ -1,37 +1,249 @@
-#include <ArduinoJSON.h>
-#include <FS.h>
-#include <SPIFFS.h>
+#include <ArduinoJson.h>
+#include <LittleFS.h>
 #include <esp_system.h>
 #include <ExtStrings.h>
 #include <Json.h>
+#include <backup/config_backup_handler.hpp>
+#include <backup/config_file_handler.hpp>
 #include <cstring>
+#include <log/log.h>
 #include <string.h>
 #include "defines.h"
-#include "Handler.h"
+#include "control/devices.h"
+#include "gates/gates.h"
+#include "handler.h"
+
+// Defined in main.cpp: exports the EEPROM config as the /config.bin mirror.
+void writeConfigMirror();
+
+namespace
+{
+    const EDConfig::BackupFileSpec BACKUP_FILES[] = {
+        {"config.bin", "/config.bin", sizeof(Config), CURRENT_VERSION, true},
+    };
+
+    constexpr size_t BACKUP_FILE_COUNT = sizeof(BACKUP_FILES) / sizeof(BACKUP_FILES[0]);
+
+    // Give the queued HTTP response time to flush, then reboot into the
+    // boot-time restore path.
+    void stageRestoreAndReboot()
+    {
+        File marker = LittleFS.open("/config.restore.pending", "w");
+        if (marker) {
+            marker.close();
+        } else {
+            LOGE("config", "failed to create restore marker");
+        }
+
+        delay(200);
+        ESP.restart();
+    }
+
+    const char* coverStateString(int state)
+    {
+        switch ((GatesState)state)
+        {
+            case GATES_STATE_CLOSED:
+                return "closed";
+            case GATES_STATE_OPENING:
+                return "opening";
+            case GATES_STATE_CLOSING:
+                return "closing";
+            case GATES_STATE_OPENED:
+                return "open";
+        }
+
+        return "closed";
+    }
+
+    void writeCover(JsonObject item, const char* id, const char* name, const Devices::CoverValue& value)
+    {
+        item["id"] = id;
+        item["name"] = name;
+        item["state"] = coverStateString(value.state);
+        item["available"] = value.available;
+    }
+
+    void writeSwitch(JsonObject item, const char* id, const char* name, const Devices::SwitchValue& value)
+    {
+        item["id"] = id;
+        item["name"] = name;
+        item["enabled"] = value.available ? value.enabled : false;
+        item["available"] = value.available;
+    }
+
+    void writeSensor(
+        JsonObject item,
+        const char* id,
+        const char* name,
+        const char* unit,
+        const Devices::SensorValue& value
+    )
+    {
+        item["id"] = id;
+        item["name"] = name;
+        item["unit"] = unit;
+        item["value"] = value.available ? value.value : 0.0f;
+        item["available"] = value.available;
+    }
+
+    void writeBinary(JsonObject item, const char* id, const char* name, const Devices::BinaryValue& value)
+    {
+        item["id"] = id;
+        item["name"] = name;
+        item["unit"] = "";
+        item["value"] = value.available ? value.value : false;
+        item["available"] = value.available;
+    }
+
+    void writeDevices(JsonObject root)
+    {
+        JsonArray sections = root["sections"].to<JsonArray>();
+
+        JsonObject access = sections.add<JsonObject>();
+        access["id"] = "access";
+        access["name"] = "Access";
+        JsonArray covers = access["covers"].to<JsonArray>();
+        writeCover(covers.add<JsonObject>(), "gates", "Gates", Devices::snapshot.gates);
+        writeCover(covers.add<JsonObject>(), "door", "Gates door mode", Devices::snapshot.door);
+        JsonArray accessSensors = access["sensors"].to<JsonArray>();
+        writeBinary(accessSensors.add<JsonObject>(), "gates_open", "Gates open", Devices::snapshot.gatesOpen);
+
+        JsonObject lighting = sections.add<JsonObject>();
+        lighting["id"] = "lighting";
+        lighting["name"] = "Lighting";
+        JsonArray switches = lighting["switches"].to<JsonArray>();
+        writeSwitch(switches.add<JsonObject>(), "watering_the_lawn", "Watering the lawn", Devices::snapshot.switches[0]);
+        writeSwitch(switches.add<JsonObject>(), "decorative_light", "Decorative light", Devices::snapshot.switches[1]);
+        writeSwitch(switches.add<JsonObject>(), "parking_space_light", "Parking space light", Devices::snapshot.switches[2]);
+        writeSwitch(switches.add<JsonObject>(), "street_light", "Street light", Devices::snapshot.switches[3]);
+
+        JsonObject septicSection = sections.add<JsonObject>();
+        septicSection["id"] = "septic";
+        septicSection["name"] = "Septic tank";
+        JsonArray sensors = septicSection["sensors"].to<JsonArray>();
+        writeSensor(
+            sensors.add<JsonObject>(),
+            "septic_tank_filling_level",
+            "Septic tank filling level",
+            "m",
+            Devices::snapshot.sensors[0]
+        );
+        writeSensor(
+            sensors.add<JsonObject>(),
+            "septic_tank_filling_volume",
+            "Septic tank filling volume",
+            "m³",
+            Devices::snapshot.sensors[1]
+        );
+        writeSensor(
+            sensors.add<JsonObject>(),
+            "septic_tank_average_absorption_speed",
+            "Septic tank average absorption speed",
+            "L/h",
+            Devices::snapshot.sensors[2]
+        );
+        writeSensor(
+            sensors.add<JsonObject>(),
+            "septic_tank_average_incoming_speed",
+            "Septic tank average incoming speed",
+            "L/h",
+            Devices::snapshot.sensors[3]
+        );
+    }
+
+    bool parseEnabled(const String& value, bool& out)
+    {
+        if (value.equalsIgnoreCase("on") || value.equalsIgnoreCase("true")) {
+            out = true;
+            return true;
+        }
+
+        if (value.equalsIgnoreCase("off") || value.equalsIgnoreCase("false")) {
+            out = false;
+            return true;
+        }
+
+        return false;
+    }
+
+    bool parseCoverCommand(const String& value, GatesCommand& out)
+    {
+        if (value.equalsIgnoreCase("open")) {
+            out = GATES_COMMAND_OPEN;
+            return true;
+        }
+
+        if (value.equalsIgnoreCase("close")) {
+            out = GATES_COMMAND_CLOSE;
+            return true;
+        }
+
+        if (value.equalsIgnoreCase("stop")) {
+            out = GATES_COMMAND_STOP;
+            return true;
+        }
+
+        return false;
+    }
+
+    int switchIndex(const String& id)
+    {
+        if (id == "watering_the_lawn") {
+            return 0;
+        }
+
+        if (id == "decorative_light") {
+            return 1;
+        }
+
+        if (id == "parking_space_light") {
+            return 2;
+        }
+
+        if (id == "street_light") {
+            return 3;
+        }
+
+        return -1;
+    }
+}
 
 void Handler::init()
 {
-    _server->serveStatic("/", SPIFFS, "/").setDefaultFile("index.html");
-    _server->serveStatic("/jquery-3.6.0.min.js", SPIFFS, "/jquery-3.6.0.min.js");
-    _server->serveStatic("/bootstrap.min.js", SPIFFS, "/bootstrap.min.js");
+    _server->serveStatic("/", LittleFS, "/").setDefaultFile("index.html");
 
     _healthCheck->registerHandlers(_server);
 
-    _server->on("/api/wifi/list", HTTP_GET, [this](AsyncWebServerRequest *request) {
-        /*AsyncResponseStream *response = request->beginResponseStream("application/json");
+    _networkApi->registerRoutes(*_server);
 
-        DynamicJsonDocument json(200);
+    _networkApi->onSettingsChanged([this](const EDNetwork::Config& cfg) {
+        auto config = _configMgr->getData();
 
-        auto networks = this->_wifiService->getWifiNetworks();
+        config->networkConfig = cfg;
 
-        for (auto i = networks.begin(); i != networks.end(); i++) {
-            json.add(*i);
-        }
-
-        serializeJson(json, *response);
-
-        request->send(response);*/
+        return persistConfig();
     });
+
+    // Archive route must be registered before the single-file /api/config
+    // handler: ESPAsyncWebServer can match the shorter path first.
+    static EDConfig::ConfigBackupHandler backupHandler({
+        BACKUP_FILES,
+        BACKUP_FILE_COUNT,
+        "shelby-config.zip",
+        0,
+        stageRestoreAndReboot
+    });
+    backupHandler.registerHandlers(_server);
+
+    static EDConfig::ConfigFileHandler configFileHandler({
+        "/config.bin",
+        sizeof(Config),
+        CURRENT_VERSION,
+        true,
+        stageRestoreAndReboot
+    });
+    configFileHandler.registerHandlers(_server);
 
     _server->on("/api/settings/modbus", HTTP_GET, [this](AsyncWebServerRequest *request) {
         AsyncResponseStream *response = request->beginResponseStream("application/json");
@@ -113,7 +325,10 @@ void Handler::init()
         config->addressMR6C = addressMR6C;
         config->addressQDY30A = addressQDY30A;
 
-        _configMgr->store();
+        if (!persistConfig()) {
+            request->send(500, "application/json", "{\"message\": \"Failed to update config\"}");
+            return;
+        }
 
         request->send(200, "application/json", "{}");
     });
@@ -124,15 +339,6 @@ void Handler::init()
         std::string payload = EDUtils::buildJson([this](JsonObject entity) {
             auto config = _configMgr->getData();
 
-            entity["wifiSSID"] = config->networkConfig.wifiSSID;
-            entity["wifiPassword"] = config->networkConfig.wifiPassword;
-            entity["mqttHost"] = config->mqtt.host;
-            entity["mqttPort"] = config->mqtt.port;
-            entity["mqttLogin"] = config->mqtt.login;
-            entity["mqttPassword"] = config->mqtt.password;
-            entity["mqttIsHADiscovery"] = config->mqttIsHADiscovery;
-            entity["mqttHADiscoveryPrefix"] = config->mqttHADiscoveryPrefix;
-            entity["mqttTopicPrefix"] = config->mqttTopicPrefix;
             entity["septicDiameter"] = config->septicDiameter;
         });
 
@@ -140,33 +346,50 @@ void Handler::init()
         request->send(response);
     });
 
-    _server->on("/api/settings/wifi", HTTP_POST, [this](AsyncWebServerRequest *request) {
-        if (!request->hasParam("wifiSSID", true) || !request->hasParam("wifiPassword", true)) {
-            request->send(422, "application/json", "{\"message\": \"not present wifiSSID or wifiPassword in request\"}");
-            return;
-        }
-
-        const AsyncWebParameter* wifiSSID = request->getParam("wifiSSID", true);
-        const AsyncWebParameter* wifiPassword = request->getParam("wifiPassword", true);
-
-        if (wifiSSID->value().length() > WIFI_SSID_LEN-1) {
-            request->send(422, "application/json", "{\"message\": \"WiFi SSID lenght more 32 symbols\"}");
-            return;
-        }
-
-        if (wifiPassword->value().length() > WIFI_PWD_LEN-1) {
-            request->send(422, "application/json", "{\"message\": \"WiFi password lenght more 63 symbols\"}");
+    _server->on("/api/settings", HTTP_POST, [this](AsyncWebServerRequest *request) {
+        if (!request->hasParam("septicDiameter", true)) {
+            request->send(422, "application/json", "{\"message\": \"not present mqtt params in request\"}");
             return;
         }
 
         auto config = _configMgr->getData();
-        std::strcpy(config->networkConfig.wifiSSID, wifiSSID->value().c_str());
-        std::strcpy(config->networkConfig.wifiPassword, wifiPassword->value().c_str());
-        config->networkConfig.isAPMode = false;
+        const AsyncWebParameter* septicDiameterParam = request->getParam("septicDiameter", true);
 
-        _configMgr->store();
+        float_t septicDiameter;
+        if (EDUtils::str2float(&septicDiameter, septicDiameterParam->value().c_str()) != EDUtils::STR2INT_SUCCESS
+            || septicDiameter < 0.0f) {
+            request->send(422, "application/json", "{\"message\": \"Incorrect septic diameter\"}");
+            return;
+        }
+
+        config->septicDiameter = septicDiameter;
+
+        if (!persistConfig()) {
+            request->send(500, "application/json", "{\"message\": \"Failed to update config\"}");
+            return;
+        }
 
         request->send(200, "application/json", "{}");
+    });
+
+    // Plaintext MQTT password matches the exposure the device already had.
+    _server->on("/api/settings/mqtt", HTTP_GET, [this](AsyncWebServerRequest *request) {
+        AsyncResponseStream *response = request->beginResponseStream("application/json");
+
+        std::string payload = EDUtils::buildJson([this](JsonObject entity) {
+            auto config = _configMgr->getData();
+
+            entity["host"] = config->mqtt.host;
+            entity["port"] = config->mqtt.port;
+            entity["login"] = config->mqtt.login;
+            entity["password"] = config->mqtt.password;
+            entity["haDiscoveryPrefix"] = config->mqttHADiscoveryPrefix;
+            entity["mqttIsHADiscovery"] = config->mqttIsHADiscovery;
+            entity["mqttTopicPrefix"] = config->mqttTopicPrefix;
+        });
+
+        response->write(payload.c_str());
+        request->send(response);
     });
 
     _server->on("/api/settings/mqtt", HTTP_POST, [this](AsyncWebServerRequest *request) {
@@ -176,6 +399,7 @@ void Handler::init()
             || !request->hasParam("login", true)
             || !request->hasParam("password", true)
             || !request->hasParam("haDiscoveryPrefix", true)
+            || !request->hasParam("mqttIsHADiscovery", true)
             || !request->hasParam("mqttTopicPrefix", true)
         ) {
             request->send(422, "application/json", "{\"message\": \"not present mqtt params in request\"}");
@@ -249,30 +473,27 @@ void Handler::init()
             config->mqttIsHADiscovery = false;
         }
 
-        _configMgr->store();
+        if (!persistConfig()) {
+            request->send(500, "application/json", "{\"message\": \"Failed to update config\"}");
+            return;
+        }
 
         request->send(200, "application/json", "{}");
     });
 
-    _server->on("/api/settings", HTTP_POST, [this](AsyncWebServerRequest *request) {
-        if (!request->hasParam("septicDiameter", true)) {
-            request->send(422, "application/json", "{\"message\": \"not present mqtt params in request\"}");
-            return;
-        }
+    _server->on("/api/devices", HTTP_GET, [this](AsyncWebServerRequest *request) {
+        AsyncResponseStream *response = request->beginResponseStream("application/json");
 
-        auto config = _configMgr->getData();
-        const AsyncWebParameter* septicDiameterParam = request->getParam("septicDiameter", true);
+        std::string payload = EDUtils::buildJson([](JsonObject root) {
+            writeDevices(root);
+        });
 
-        float_t septicDiameter;
-        if (EDUtils::str2float(&septicDiameter, septicDiameterParam->value().c_str()) != EDUtils::STR2INT_SUCCESS) {
-            request->send(422, "application/json", "{\"message\": \"Incorrect septic diameter\"}");
-            return;
-        }
+        response->write(payload.c_str());
+        request->send(response);
+    });
 
-        config->septicDiameter = septicDiameter;
-        _configMgr->store();
-
-        request->send(200, "application/json", "{}");
+    _server->on("/api/devices/set", HTTP_POST, [this](AsyncWebServerRequest *request) {
+        handleDeviceSet(request);
     });
 
     _server->on("/api/status", HTTP_GET, [this](AsyncWebServerRequest *request) {
@@ -337,4 +558,95 @@ void Handler::init()
     });
 
     _server->begin();
+}
+
+bool Handler::persistConfig()
+{
+    if (!_configMgr->store()) {
+        return false;
+    }
+
+    // EEPROM is the source of truth; the LittleFS mirror is only an export
+    // used by the backup endpoints. A mirror failure must not fail the save.
+    writeConfigMirror();
+
+    return true;
+}
+
+void Handler::handleDeviceSet(AsyncWebServerRequest* request)
+{
+    if (!request->hasParam("id", true)) {
+        request->send(422, "application/json", "{\"message\": \"not present device params in request\"}");
+        return;
+    }
+
+    const String id = request->getParam("id", true)->value();
+    const bool hasCommand = request->hasParam("command", true);
+    const bool hasEnabled = request->hasParam("enabled", true);
+
+    if (id == "gates" || id == "door") {
+        if (hasEnabled) {
+            request->send(422, "application/json", "{\"message\": \"field not supported by device\"}");
+            return;
+        }
+
+        if (!hasCommand) {
+            request->send(422, "application/json", "{\"message\": \"not present device params in request\"}");
+            return;
+        }
+
+        GatesCommand command;
+        if (!parseCoverCommand(request->getParam("command", true)->value(), command)) {
+            request->send(422, "application/json", "{\"message\": \"incorrect command value\"}");
+            return;
+        }
+
+        if (Devices::controls.gates == nullptr) {
+            request->send(500, "application/json", "{\"message\": \"device not ready\"}");
+            return;
+        }
+
+        if (id == "gates") {
+            Devices::controls.gates->gatesChange(command);
+        } else {
+            Devices::controls.gates->doorChange(command);
+        }
+
+        request->send(200, "application/json", "{}");
+        return;
+    }
+
+    const int index = switchIndex(id);
+    if (index < 0) {
+        request->send(422, "application/json", "{\"message\": \"unknown id\"}");
+        return;
+    }
+
+    if (hasCommand) {
+        request->send(422, "application/json", "{\"message\": \"field not supported by device\"}");
+        return;
+    }
+
+    if (!hasEnabled) {
+        request->send(422, "application/json", "{\"message\": \"not present device params in request\"}");
+        return;
+    }
+
+    bool enable = false;
+    if (!parseEnabled(request->getParam("enabled", true)->value(), enable)) {
+        request->send(422, "application/json", "{\"message\": \"incorrect enabled value\"}");
+        return;
+    }
+
+    if (Devices::controls.switches[index] == nullptr) {
+        request->send(500, "application/json", "{\"message\": \"device not ready\"}");
+        return;
+    }
+
+    if (!Devices::controls.switches[index]->setState(enable)) {
+        request->send(500, "application/json", "{\"message\": \"device not ready\"}");
+        return;
+    }
+
+    request->send(200, "application/json", "{}");
 }

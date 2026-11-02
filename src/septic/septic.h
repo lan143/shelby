@@ -5,6 +5,7 @@
 #include <discovery.h>
 #include <mqtt.h>
 #include <ready.h>
+#include <utility>
 
 #include "septic_derived_sensor.h"
 #include "septic_water_level.h"
@@ -28,6 +29,11 @@ public:
 
     void update();
     EDHealthCheck::ReadyResult ready() override;
+
+    std::pair<float_t, bool> getLevel();
+    std::pair<float_t, bool> getVolume();
+    std::pair<float_t, bool> getAbsorptionSpeed();
+    std::pair<float_t, bool> getIncomingSpeed();
 
 private:
     void processReading(float_t level);

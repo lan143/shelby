@@ -87,6 +87,26 @@ bool Septic::init(
     return isVolumeReady && isAbsorptionSpeedReady && isIncomingSpeedReady;
 }
 
+std::pair<float_t, bool> Septic::getLevel()
+{
+    return _waterLevel.getValue();
+}
+
+std::pair<float_t, bool> Septic::getVolume()
+{
+    return std::make_pair(_volume, _hasValidReading);
+}
+
+std::pair<float_t, bool> Septic::getAbsorptionSpeed()
+{
+    return std::make_pair(_absorptionSpeedValue, _septicDiameter != 0.0f);
+}
+
+std::pair<float_t, bool> Septic::getIncomingSpeed()
+{
+    return std::make_pair(_incomingSpeedValue, _septicDiameter != 0.0f);
+}
+
 void Septic::update()
 {
     _waterLevel.update();
