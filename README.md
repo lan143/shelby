@@ -77,7 +77,7 @@ pio run -e kc868a2 -t uploadfs
 **Settings**
 
 - Wi-Fi: SSID и пароль;
-- MQTT: хост, порт, логин, пароль, топики состояния и команд, префикс авто-обнаружения Home Assistant, включение discovery;
+- MQTT: хост, порт, логин, пароль, единый префикс топиков устройства, префикс авто-обнаружения Home Assistant, включение discovery;
 - Modbus: скорость (1200–115200) и адреса WB-MR6C и QDY-30A (1–254);
 - диаметр септика.
 
@@ -91,68 +91,78 @@ pio run -e kc868a2 -t uploadfs
 
 После публикации discovery-конфигураций в Home Assistant появляются сущности:
 
-| Сущность | Тип | Источник |
+| Сущность | Тип | Топик состояния |
 |---|---|---|
-| Ворота | cover, класс `gate` | `gates_state` |
-| Калитка | cover, класс `door` | `door_state` |
-| Ворота открыты | binary_sensor, класс `garage_door` | `isGatesOpen` |
-| Полив газона | switch | `wateringLawnRelay` |
-| Свет парковки | switch | `parkingLight` |
-| Уличный свет | switch | `streetLight` |
-| Декоративный свет | switch | `decorativeLight` |
-| Уровень септика | sensor, м | `septicFillingLevel` |
-| Объём септика | sensor, м³ | `septicFillingVolume` |
-| Средняя скорость впитывания | sensor, л/ч | `septicAvgAbsorptionSpeed` |
-| Средняя скорость притока | sensor, л/ч | `septicAvgIncomingSpeed` |
+| Ворота | cover, класс `gate` | `{prefix}/gates/state` |
+| Калитка | cover, класс `door` | `{prefix}/door/state` |
+| Ворота открыты | binary_sensor, класс `garage_door` | `{prefix}/gates_open/state` |
+| Полив газона | switch | `{prefix}/watering_the_lawn/state` |
+| Свет парковки | switch | `{prefix}/parking_space_light/state` |
+| Уличный свет | switch | `{prefix}/street_light/state` |
+| Декоративный свет | switch | `{prefix}/decorative_light/state` |
+| Уровень септика | sensor, м | `{prefix}/septic_tank_filling_level/state` |
+| Объём септика | sensor, м³ | `{prefix}/septic_tank_filling_volume/state` |
+| Средняя скорость впитывания | sensor, л/ч | `{prefix}/septic_tank_average_absorption_speed/state` |
+| Средняя скорость притока | sensor, л/ч | `{prefix}/septic_tank_average_incoming_speed/state` |
 
-Объём и скорости септика создаются только при заданном диаметре (`septicDiameter != 0`). Значение бинарного датчика ворот появляется после первого успешного чтения входа MR6C.
+Объём и скорости септика создаются только при заданном диаметре (`septicDiameter != 0`). Значение бинарного датчика ворот появляется после первого успешного чтения входа MR6C и публикуется retained.
 
 ## MQTT API
 
-По умолчанию используются топики:
+У каждой сущности свои топики состояния и команд; общий префикс по умолчанию — `shelby/<chipID>`. Префикс задаётся в веб-интерфейсе, порт брокера по умолчанию — 1883. Префикс авто-обнаружения Home Assistant — `homeassistant`.
 
 | Назначение | Топик |
 |---|---|
-| Состояние | `shelby/<chipID>/state` |
-| Команды | `shelby/<chipID>/set` |
+| Префикс топиков устройства | `shelby/<chipID>` (`{prefix}`) |
 | Авто-обнаружение HA | `homeassistant` (префикс) |
 
-Порт брокера по умолчанию — 1883. Топики и префикс можно изменить в веб-интерфейсе.
+Состояния:
 
-Пример сообщения состояния:
+| Сущность | Топик | Payload |
+|---|---|---|
+| Ворота | `{prefix}/gates/state` | `closed`, `opening`, `closing`, `open` |
+| Калитка | `{prefix}/door/state` | `closed`, `opening`, `closing`, `open` |
+| Ворота открыты | `{prefix}/gates_open/state` | `true`, `false` |
+| Полив газона | `{prefix}/watering_the_lawn/state` | `{"enabled":"on"}` / `{"enabled":"off"}` |
+| Декоративный свет | `{prefix}/decorative_light/state` | `{"enabled":"on"}` / `{"enabled":"off"}` |
+| Свет парковки | `{prefix}/parking_space_light/state` | `{"enabled":"on"}` / `{"enabled":"off"}` |
+| Уличный свет | `{prefix}/street_light/state` | `{"enabled":"on"}` / `{"enabled":"off"}` |
+| Уровень септика | `{prefix}/septic_tank_filling_level/state` | число, м |
+| Объём септика | `{prefix}/septic_tank_filling_volume/state` | число, м³ |
+| Средняя скорость впитывания | `{prefix}/septic_tank_average_absorption_speed/state` | число, л/ч |
+| Средняя скорость притока | `{prefix}/septic_tank_average_incoming_speed/state` | число, л/ч |
 
-```json
-{
-  "gates_state": "closed",
-  "door_state": "closed",
-  "wateringLawnRelay": "false",
-  "parkingLight": "false",
-  "streetLight": "false",
-  "decorativeLight": "false",
-  "septicFillingLevel": 1.234,
-  "septicFillingVolume": 1.9,
-  "septicAvgAbsorptionSpeed": 0,
-  "septicAvgIncomingSpeed": 0,
-  "isGatesOpen": "false"
-}
+Команды:
+
+| Сущность | Топик | Payload |
+|---|---|---|
+| Ворота | `{prefix}/gates/set` | `open`, `close`, `stop`; любое другое значение — остановка |
+| Калитка | `{prefix}/door/set` | `open`, `close`, `stop`; любое другое значение — остановка |
+| Полив газона | `{prefix}/watering_the_lawn/set` | `on`, `off` |
+| Декоративный свет | `{prefix}/decorative_light/set` | `on`, `off` |
+| Свет парковки | `{prefix}/parking_space_light/set` | `on`, `off` |
+| Уличный свет | `{prefix}/street_light/set` | `on`, `off` |
+
+Примеры:
+
+```text
+Топик:   shelby/<chipID>/gates/set
+Payload: open
 ```
 
-Уровень и объём могут отсутствовать, если равны нулю. `isGatesOpen` отсутствует до первого чтения датчика.
+```text
+Топик:   shelby/<chipID>/street_light/set
+Payload: on
+```
 
-Команды отправляются в топик команд:
+```text
+Топик:   shelby/<chipID>/street_light/state
+Payload: {"enabled":"on"}
+```
 
-| Действие | Сообщение |
-|---|---|
-| Открыть ворота | `{"gates_payload": "open"}` |
-| Закрыть ворота | `{"gates_payload": "close"}` |
-| Остановить ворота | `{"gates_payload": "stop"}` |
-| Открыть калитку | `{"door_payload": "open"}` |
-| Включить уличный свет | `{"streetLight": true}` |
-| Выключить полив газона | `{"wateringLawnRelay": false}` |
+Состояние ворот и калитки публикуется при изменении не чаще раза в 500 мс; состояние реле — при изменении и повторно каждые 60 секунд; датчики и бинарный датчик — при изменении и повторно каждые 60 секунд.
 
-Для `gates_payload` и `door_payload` значение `open` запускает открытие, `close` — закрытие, любое другое значение трактуется как остановка. Остановка переводит состояние в `open`, а не в неизвестное состояние.
-
-Состояние публикуется без флага retained; discovery-конфигурации Home Assistant публикуются с retained.
+Состояние ворот, калитки и реле публикуется без флага retained; состояние датчиков и бинарного датчика, а также discovery-конфигурации Home Assistant — с retained. Команды, отправленные с флагом retained, игнорируются.
 
 ## Мониторинг септика
 
@@ -160,7 +170,7 @@ pio run -e kc868a2 -t uploadfs
 
 - Уровень пересчитывается в метры и округляется до трёх знаков.
 - Показания выше 3,5 м отбрасываются как недостоверные.
-- При ошибке чтения или отбраковке повторная попытка выполняется через 5 секунд.
+- При ошибке чтения или отбраковке следующая попытка выполняется в очередном цикле опроса.
 - При заданном диаметре объём считается как `π × (диаметр / 2)² × уровень`, в м³.
 - Средняя скорость впитывания считается при падении уровня, средняя скорость притока — при росте; обе — в л/ч и только при уровне ниже 2,8 м.
 - Скорости усредняются по кольцевому буферу из 10 значений и сбрасываются в 0, если обновлений не было 5 минут.

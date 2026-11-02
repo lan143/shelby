@@ -2,10 +2,24 @@
 #include "defines.h"
 #include "gates.h"
 
-void Gates::init(EDHA::Device* device, std::string stateTopic, std::string commandTopic)
+void Gates::init(EDHA::Device* device, std::string topicPrefix)
 {
     pinMode(GATE_OPEN, INPUT);
     pinMode(GATE_CLOSE, INPUT);
+
+    char topic[256] = {0};
+
+    snprintf(topic, sizeof(topic), "%s/gates/state", topicPrefix.c_str());
+    _gatesStateTopic = topic;
+
+    snprintf(topic, sizeof(topic), "%s/gates/set", topicPrefix.c_str());
+    _gatesCommandTopic = topic;
+
+    snprintf(topic, sizeof(topic), "%s/door/state", topicPrefix.c_str());
+    _doorStateTopic = topic;
+
+    snprintf(topic, sizeof(topic), "%s/door/set", topicPrefix.c_str());
+    _doorCommandTopic = topic;
 
     _discoveryMgr->addCover(
         device,
@@ -14,26 +28,24 @@ void Gates::init(EDHA::Device* device, std::string stateTopic, std::string comma
         "gates_cover_shelby"
     )
         ->setDeviceClass(EDHA::deviceClassCoverGate)
-        ->setCommandTopic(commandTopic)
-        ->setStateTopic(stateTopic)
-        ->setValueTemplate("{{ value_json.gates_state }}")
-        ->setPayloadClose("{\"gates_payload\": \"close\"}")
-        ->setPayloadOpen("{\"gates_payload\": \"open\"}")
-        ->setPayloadStop("{\"gates_payload\": \"stop\"}");
+        ->setCommandTopic(_gatesCommandTopic)
+        ->setStateTopic(_gatesStateTopic)
+        ->setPayloadClose("close")
+        ->setPayloadOpen("open")
+        ->setPayloadStop("stop");
 
-        _discoveryMgr->addCover(
-            device,
-            "Gates door mode",
-            "gates_door_mode",
-            "gates_door_mode_cover_shelby"
-        )
-            ->setDeviceClass(EDHA::deviceClassCoverDoor)
-            ->setCommandTopic(commandTopic)
-            ->setStateTopic(stateTopic)
-            ->setValueTemplate("{{ value_json.door_state }}")
-            ->setPayloadClose("{\"door_payload\": \"close\"}")
-            ->setPayloadOpen("{\"door_payload\": \"open\"}")
-            ->setPayloadStop("{\"door_payload\": \"stop\"}");
+    _discoveryMgr->addCover(
+        device,
+        "Gates door mode",
+        "gates_door_mode",
+        "gates_door_mode_cover_shelby"
+    )
+        ->setDeviceClass(EDHA::deviceClassCoverDoor)
+        ->setCommandTopic(_doorCommandTopic)
+        ->setStateTopic(_doorStateTopic)
+        ->setPayloadClose("close")
+        ->setPayloadOpen("open")
+        ->setPayloadStop("stop");
 }
 
 void Gates::gatesChange(GatesCommand command)
@@ -127,7 +139,7 @@ void Gates::loop()
             }
 
             _isMotorOpening = true;
-        } else if (_isMotorOpening && _stateMgr->getState().isGatesOpen()) {
+        } else if (_isMotorOpening && isGatesOpen()) {
             if (_gatesState == GATES_STATE_OPENING) {
                 gatesStateUpdate(GATES_STATE_OPENED);
             } else if (_doorState == GATES_STATE_OPENING) {
@@ -143,7 +155,7 @@ void Gates::loop()
             }
 
             _isMotorClosing = true;
-        } else if (_isMotorClosing && !_stateMgr->getState().isGatesOpen()) {
+        } else if (_isMotorClosing && !isGatesOpen()) {
             gatesStateUpdate(GATES_STATE_CLOSED);
             doorStateUpdate(GATES_STATE_CLOSED);
 
@@ -162,18 +174,25 @@ void Gates::loop()
 
         _lastUpdateMeasurementsTime = esp_timer_get_time();
     }
+
+    // Same cadence and change-only semantics the aggregate StateMgr provided,
+    // but each cover publishes its own non-retained payload independently.
+    if ((_lastStatePublishTime + 500000) < esp_timer_get_time()) { // every 0.5 second
+        publishState(_gatesStateTopic, _gatesState, &_lastPublishedGatesState);
+        publishState(_doorStateTopic, _doorState, &_lastPublishedDoorState);
+
+        _lastStatePublishTime = esp_timer_get_time();
+    }
 }
 
 void Gates::gatesStateUpdate(GatesState newState)
 {
     _gatesState = newState;
-    _stateMgr->getState().setGatesState(_gatesState);
 }
 
 void Gates::doorStateUpdate(GatesState newState)
 {
     _doorState = newState;
-    _stateMgr->getState().setDoorState(_doorState);
 }
 
 bool Gates::skipCommand(GatesState state, GatesCommand command)
@@ -198,4 +217,40 @@ bool Gates::isMotorOpening()
 bool Gates::isMotorClosing()
 {
     return _closeMeasurements > 25;
+}
+
+bool Gates::isGatesOpen()
+{
+    auto state = _gatesOpenSensor->isActive();
+
+    // Until the MR6C answered, the value is unknown; treat it as closed exactly
+    // like the old aggregate State did before its first reading.
+    return state.second && state.first;
+}
+
+void Gates::publishState(const std::string& topic, GatesState state, GatesState* lastPublishedState)
+{
+    if (state == *lastPublishedState) {
+        return;
+    }
+
+    if (_mqtt->publish(topic.c_str(), statePayload(state), false)) {
+        *lastPublishedState = state;
+    }
+}
+
+const char* Gates::statePayload(GatesState state)
+{
+    switch (state) {
+        case GATES_STATE_CLOSED:
+            return "closed";
+        case GATES_STATE_OPENING:
+            return "opening";
+        case GATES_STATE_CLOSING:
+            return "closing";
+        case GATES_STATE_OPENED:
+            return "open";
+    }
+
+    return "closed";
 }

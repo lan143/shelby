@@ -11,19 +11,16 @@
 #include <mqtt.h>
 #include <relay/wb_mr6c.h>
 #include <wirenboard.h>
-#include <state/state_mgr.h>
 #include <network/network.h>
 #include <log/log.h>
 
 #include "defines.h"
 #include "config.h"
 #include "gates/gates.h"
-#include "command/command_consumer.h"
+#include "gates/gates_command_handler.h"
 #include "relay/relay.h"
 #include "sensor/gates_open_sensor.h"
 #include "septic/septic.h"
-#include "state/state.h"
-#include "state/producer.h"
 #include "web/handler.h"
 
 EDConfig::DataMgr<Config> configMgr(new EDConfig::StorageEEPROM<Config>(EEPROM_SIZE));
@@ -33,9 +30,7 @@ EDMQTT::MQTT mqtt;
 EDHA::DiscoveryMgr discoveryMgr;
 Relay gatesRelay;
 Relay doorRelay;
-StateProducer stateProducer(&mqtt);
-EDUtils::StateMgr<State> stateMgr(&stateProducer);
-Gates gates(&gatesRelay, &doorRelay, &stateMgr, &discoveryMgr);
+Gates* gates;
 EDWB::WirenBoard modbus(Serial2);
 EDCommon::Relay::WBMR6C* lawnWateringRelay;
 EDCommon::Relay::WBMR6C* decorativeRelay;
@@ -43,7 +38,8 @@ EDCommon::Relay::WBMR6C* parkingRelay;
 EDCommon::Relay::WBMR6C* streetRelay;
 GatesOpenSensor* gatesOpenSensor;
 Septic* septic;
-CommandConsumer* commandConsumer;
+GatesCommandHandler* gatesCommandHandler;
+GatesCommandHandler* doorCommandHandler;
 Handler handler(&configMgr, &networkMgr, &healthCheck, &modbus);
 
 // Validates the persisted v2 blob with the same CRC16 used by EDConfig::DataMgr.
@@ -168,15 +164,6 @@ void setup()
     ArduinoOTA.setPassword("somestrongpassword");
     ArduinoOTA.begin();
 
-    // The legacy modules still take full topics; keep their runtime strings
-    // byte-identical to the pre-v3 values until later waves migrate them.
-    char stateTopic[MQTT_TOPIC_LEN];
-    char commandTopic[MQTT_TOPIC_LEN];
-    snprintf(stateTopic, sizeof(stateTopic), "%s/state", configMgr.getData()->mqttTopicPrefix);
-    snprintf(commandTopic, sizeof(commandTopic), "%s/set", configMgr.getData()->mqttTopicPrefix);
-
-    stateProducer.init(stateTopic);
-
     mqtt.init(configMgr.getData()->mqtt);
     networkMgr.OnConnect([&](bool isConnected) {
         networkLogger.enable(isConnected);
@@ -208,7 +195,6 @@ void setup()
 
     gatesRelay.init(RELAY_GATE, false);
     doorRelay.init(RELAY_DOOR, false);
-    gates.init(device, stateTopic, commandTopic);
 
     EDWB::MR6C* mr6c = modbus.addMR6C(configMgr.getData()->addressMR6C);
 
@@ -245,15 +231,22 @@ void setup()
         EDCommon::Relay::withDiscovery(&discoveryMgr, device),
     });
 
-    gatesOpenSensor = new GatesOpenSensor(&stateMgr, mr6c);
+    gatesOpenSensor = new GatesOpenSensor(mr6c);
     gatesOpenSensor->init(500, {
         EDCommon::BinarySensor::withMQTT(&mqtt, configMgr.getData()->mqttTopicPrefix, "shelby", "Gates open"),
         EDCommon::BinarySensor::withDiscovery(&discoveryMgr, device),
     });
 
-    commandConsumer = new CommandConsumer(&gates);
-    commandConsumer->init(commandTopic);
-    mqtt.subscribe(commandConsumer);
+    gates = new Gates(&gatesRelay, &doorRelay, gatesOpenSensor, &mqtt, &discoveryMgr);
+    gates->init(device, configMgr.getData()->mqttTopicPrefix);
+
+    gatesCommandHandler = new GatesCommandHandler(gates, GATES_COMMAND_TARGET_GATES);
+    gatesCommandHandler->init(gates->gatesCommandTopic().c_str());
+    mqtt.subscribe(gatesCommandHandler);
+
+    doorCommandHandler = new GatesCommandHandler(gates, GATES_COMMAND_TARGET_DOOR);
+    doorCommandHandler->init(gates->doorCommandTopic().c_str());
+    mqtt.subscribe(doorCommandHandler);
 
     septic = new Septic(
         modbus.addQDY30A(configMgr.getData()->addressQDY30A),
@@ -275,8 +268,7 @@ void loop()
     networkMgr.loop();
     discoveryMgr.loop();
     ArduinoOTA.handle();
-    gates.loop();
-    stateMgr.loop();
+    gates->loop();
     healthCheck.loop();
     septic->update();
     networkLogger.update();

@@ -1,10 +1,11 @@
 #pragma once
 
+#include <binary_sensor/binary_sensor.h>
 #include <discovery.h>
-#include <state/state_mgr.h>
+#include <mqtt.h>
+
 #include "gates_state.h"
 #include "relay/relay.h"
-#include "state/state.h"
 
 enum GatesRelayState : int
 {
@@ -25,16 +26,29 @@ enum GatesCommand : int
 class Gates
 {
 public:
-    Gates(Relay* gatesRelay, Relay* doorRelay, EDUtils::StateMgr<State>* stateMgr, EDHA::DiscoveryMgr* discoveryMgr) :
-        _gatesRelay(gatesRelay), _doorRelay(doorRelay), _stateMgr(stateMgr), _discoveryMgr(discoveryMgr) {}
+    Gates(
+        Relay* gatesRelay,
+        Relay* doorRelay,
+        EDCommon::BinarySensor::BinarySensor* gatesOpenSensor,
+        EDMQTT::MQTT* mqtt,
+        EDHA::DiscoveryMgr* discoveryMgr
+    ) :
+        _gatesRelay(gatesRelay),
+        _doorRelay(doorRelay),
+        _gatesOpenSensor(gatesOpenSensor),
+        _mqtt(mqtt),
+        _discoveryMgr(discoveryMgr) {}
 
 public:
-    void init(EDHA::Device* device, std::string stateTopic, std::string commandTopic);
+    void init(EDHA::Device* device, std::string topicPrefix);
 
     void gatesChange(GatesCommand command);
     void doorChange(GatesCommand command);
 
     void loop();
+
+    const std::string& gatesCommandTopic() const { return _gatesCommandTopic; }
+    const std::string& doorCommandTopic() const { return _doorCommandTopic; }
 
 private:
     void gatesStateUpdate(GatesState newState);
@@ -43,15 +57,28 @@ private:
 
     bool isMotorOpening();
     bool isMotorClosing();
+    bool isGatesOpen();
+
+    void publishState(const std::string& topic, GatesState state, GatesState* lastPublishedState);
+    static const char* statePayload(GatesState state);
 
 private:
     Relay* _gatesRelay;
     Relay* _doorRelay;
-    EDUtils::StateMgr<State>* _stateMgr;
+    EDCommon::BinarySensor::BinarySensor* _gatesOpenSensor;
+    EDMQTT::MQTT* _mqtt;
     EDHA::DiscoveryMgr* _discoveryMgr;
+
+    std::string _gatesStateTopic;
+    std::string _gatesCommandTopic;
+    std::string _doorStateTopic;
+    std::string _doorCommandTopic;
 
     GatesState _gatesState = GATES_STATE_CLOSED;
     GatesState _doorState = GATES_STATE_CLOSED;
+    GatesState _lastPublishedGatesState = GATES_STATE_CLOSED;
+    GatesState _lastPublishedDoorState = GATES_STATE_CLOSED;
+    uint64_t _lastStatePublishTime = 0;
     uint64_t _lastMotorUpdateTime = 0;
     bool _isMotorOpening = false;
     bool _isMotorClosing = false;
