@@ -135,7 +135,7 @@ Settings POST bodies must carry every key, even when only one value changed:
 
 `GET /api/status` returns `wifiStatus` (`connected`/`disconnected`), `freeHeap`, `uptime` (seconds) and `lastResetReason`.
 
-Restore flow: `POST /api/config/backup` and `POST /api/config` write `/config.bin`, create `/config.restore.pending` and reboot. At the next boot `src/main.cpp` validates the file (size, `CURRENT_VERSION`, CRC16) and copies it into EEPROM before `configMgr.load()`; any failure keeps the existing EEPROM config. Register the `/api/config/backup` route **before** `/api/config`, or the shorter path can shadow the archive handler.
+Restore flow: `POST /api/config/backup` and `POST /api/config` write `/config.bin`, create `/config.restore.pending` and reboot. At the next boot `src/main.cpp` validates the file (size, `CURRENT_VERSION`, CRC16) and copies it into EEPROM before `configMgr.load()`; any failure keeps the existing EEPROM config. ESPAsyncWebServer matches plain-URI routes BackwardCompatible (exact match OR prefix + `/`, so `/api/settings` also swallows `/api/settings/mqtt`), and the first registered handler wins; therefore registration order must be: static, healthcheck, NetworkApi, `/api/config/backup`, `/api/config`, `/api/settings/modbus`, `/api/settings/mqtt`, bare `/api/settings`, `/api/devices` GET, `/api/devices/set` POST, `/api/status`, `/api/reboot` — register the `/api/config/backup` route **before** `/api/config` and every `/api/settings/<sub>` route **before** bare `/api/settings`, or the shorter path shadows the longer handler.
 
 ## MQTT contract
 

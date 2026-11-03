@@ -333,45 +333,7 @@ void Handler::init()
         request->send(200, "application/json", "{}");
     });
 
-    _server->on("/api/settings", HTTP_GET, [this](AsyncWebServerRequest *request) {
-        AsyncResponseStream *response = request->beginResponseStream("application/json");
-
-        std::string payload = EDUtils::buildJson([this](JsonObject entity) {
-            auto config = _configMgr->getData();
-
-            entity["septicDiameter"] = config->septicDiameter;
-        });
-
-        response->write(payload.c_str());
-        request->send(response);
-    });
-
-    _server->on("/api/settings", HTTP_POST, [this](AsyncWebServerRequest *request) {
-        if (!request->hasParam("septicDiameter", true)) {
-            request->send(422, "application/json", "{\"message\": \"not present mqtt params in request\"}");
-            return;
-        }
-
-        auto config = _configMgr->getData();
-        const AsyncWebParameter* septicDiameterParam = request->getParam("septicDiameter", true);
-
-        float_t septicDiameter;
-        if (EDUtils::str2float(&septicDiameter, septicDiameterParam->value().c_str()) != EDUtils::STR2INT_SUCCESS
-            || septicDiameter < 0.0f) {
-            request->send(422, "application/json", "{\"message\": \"Incorrect septic diameter\"}");
-            return;
-        }
-
-        config->septicDiameter = septicDiameter;
-
-        if (!persistConfig()) {
-            request->send(500, "application/json", "{\"message\": \"Failed to update config\"}");
-            return;
-        }
-
-        request->send(200, "application/json", "{}");
-    });
-
+    // specific /api/settings/* routes MUST be registered before bare /api/settings (BackwardCompatible URI matching: exact OR prefix + '/')
     // Plaintext MQTT password matches the exposure the device already had.
     _server->on("/api/settings/mqtt", HTTP_GET, [this](AsyncWebServerRequest *request) {
         AsyncResponseStream *response = request->beginResponseStream("application/json");
@@ -472,6 +434,45 @@ void Handler::init()
         } else {
             config->mqttIsHADiscovery = false;
         }
+
+        if (!persistConfig()) {
+            request->send(500, "application/json", "{\"message\": \"Failed to update config\"}");
+            return;
+        }
+
+        request->send(200, "application/json", "{}");
+    });
+
+    _server->on("/api/settings", HTTP_GET, [this](AsyncWebServerRequest *request) {
+        AsyncResponseStream *response = request->beginResponseStream("application/json");
+
+        std::string payload = EDUtils::buildJson([this](JsonObject entity) {
+            auto config = _configMgr->getData();
+
+            entity["septicDiameter"] = config->septicDiameter;
+        });
+
+        response->write(payload.c_str());
+        request->send(response);
+    });
+
+    _server->on("/api/settings", HTTP_POST, [this](AsyncWebServerRequest *request) {
+        if (!request->hasParam("septicDiameter", true)) {
+            request->send(422, "application/json", "{\"message\": \"not present mqtt params in request\"}");
+            return;
+        }
+
+        auto config = _configMgr->getData();
+        const AsyncWebParameter* septicDiameterParam = request->getParam("septicDiameter", true);
+
+        float_t septicDiameter;
+        if (EDUtils::str2float(&septicDiameter, septicDiameterParam->value().c_str()) != EDUtils::STR2INT_SUCCESS
+            || septicDiameter < 0.0f) {
+            request->send(422, "application/json", "{\"message\": \"Incorrect septic diameter\"}");
+            return;
+        }
+
+        config->septicDiameter = septicDiameter;
 
         if (!persistConfig()) {
             request->send(500, "application/json", "{\"message\": \"Failed to update config\"}");
