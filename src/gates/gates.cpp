@@ -1,6 +1,24 @@
 #include <enum/device_class.h>
+#include <log/log.h>
+
 #include "defines.h"
 #include "gates.h"
+
+static constexpr uint64_t GATES_MOTION_RESYNC_TIMEOUT_US = 120000000ULL;
+
+static const char* commandPayload(GatesCommand command)
+{
+    switch (command) {
+        case GATES_COMMAND_OPEN:
+            return "open";
+        case GATES_COMMAND_CLOSE:
+            return "close";
+        case GATES_COMMAND_STOP:
+            return "stop";
+    }
+
+    return "stop";
+}
 
 void Gates::init(EDHA::Device* device, std::string topicPrefix)
 {
@@ -51,16 +69,21 @@ void Gates::init(EDHA::Device* device, std::string topicPrefix)
 void Gates::gatesChange(GatesCommand command)
 {
     if (_state != GATES_RELAY_STATE_IDLE) {
+        LOGW("gates", "rejected gates %s: relay busy", commandPayload(command));
         return;
     }
 
     if (_doorState != GATES_STATE_CLOSED) {
+        LOGW("gates", "rejected gates %s: door not closed", commandPayload(command));
         return;
     }
 
     if (skipCommand(_gatesState, command)) {
+        LOGW("gates", "rejected gates %s: invalid from state %s", commandPayload(command), statePayload(_gatesState));
         return;
     }
+
+    LOGI("gates", "accepted gates %s", commandPayload(command));
 
     _state = GATES_RELAY_STATE_GATE_ON;
 
@@ -80,16 +103,21 @@ void Gates::gatesChange(GatesCommand command)
 void Gates::doorChange(GatesCommand command)
 {
     if (_state != GATES_RELAY_STATE_IDLE) {
+        LOGW("gates", "rejected door %s: relay busy", commandPayload(command));
         return;
     }
 
     if (_gatesState != GATES_STATE_CLOSED) {
+        LOGW("gates", "rejected door %s: gates not closed", commandPayload(command));
         return;
     }
 
     if (skipCommand(_doorState, command)) {
+        LOGW("gates", "rejected door %s: invalid from state %s", commandPayload(command), statePayload(_doorState));
         return;
     }
+
+    LOGI("gates", "accepted door %s", commandPayload(command));
 
     _state = GATES_RELAY_STATE_DOOR_ON;
 
@@ -162,7 +190,50 @@ void Gates::loop()
             _isMotorClosing = false;
         }
 
+        if (isMotorOpening() || isMotorClosing()) {
+            _lastMotionTimeUs = esp_timer_get_time();
+        }
+
         _lastMotorUpdateTime = esp_timer_get_time();
+
+        if (!isMotorOpening() && !isMotorClosing()
+            && (esp_timer_get_time() - _lastMotionTimeUs) >= GATES_MOTION_RESYNC_TIMEOUT_US) {
+            bool gatesOpen = isGatesOpen();
+
+            GatesState gatesResolved = _gatesState;
+            if (_gatesState == GATES_STATE_OPENING || _gatesState == GATES_STATE_CLOSING) {
+                gatesResolved = gatesOpen ? GATES_STATE_OPENED : GATES_STATE_CLOSED;
+            } else if (_gatesState == GATES_STATE_OPENED && !gatesOpen) {
+                gatesResolved = GATES_STATE_CLOSED;
+            }
+
+            if (gatesResolved != _gatesState) {
+                LOGW(
+                    "gates",
+                    "gates state resynced: %s -> %s (motion timeout)",
+                    statePayload(_gatesState),
+                    statePayload(gatesResolved)
+                );
+                gatesStateUpdate(gatesResolved);
+            }
+
+            GatesState doorResolved = _doorState;
+            if (_doorState == GATES_STATE_OPENING || _doorState == GATES_STATE_CLOSING) {
+                doorResolved = gatesOpen ? GATES_STATE_OPENED : GATES_STATE_CLOSED;
+            } else if (_doorState == GATES_STATE_OPENED && !gatesOpen) {
+                doorResolved = GATES_STATE_CLOSED;
+            }
+
+            if (doorResolved != _doorState) {
+                LOGW(
+                    "gates",
+                    "door state resynced: %s -> %s (motion timeout)",
+                    statePayload(_doorState),
+                    statePayload(doorResolved)
+                );
+                doorStateUpdate(doorResolved);
+            }
+        }
     }
 
     if ((_lastUpdateMeasurementsTime + 1000) < esp_timer_get_time()) { // every 0.001 second
@@ -178,8 +249,36 @@ void Gates::loop()
     // Same cadence and change-only semantics the aggregate StateMgr provided,
     // but each cover publishes its own non-retained payload independently.
     if ((_lastStatePublishTime + 500000) < esp_timer_get_time()) { // every 0.5 second
-        publishState(_gatesStateTopic, _gatesState, &_lastPublishedGatesState);
-        publishState(_doorStateTopic, _doorState, &_lastPublishedDoorState);
+        bool connected = _mqtt->isConnected();
+
+        if (connected != _mqttWasConnected) {
+            _forceStateRepublish = true;
+            _mqttWasConnected = connected;
+        }
+
+        if (connected && _forceStateRepublish) {
+            // MQTT has (re)connected: publish both covers even when unchanged,
+            // and keep trying until both publishes succeed.
+            bool gatesPublished = publishState(
+                _gatesStateTopic,
+                _gatesState,
+                &_lastPublishedGatesState,
+                true
+            );
+            bool doorPublished = publishState(
+                _doorStateTopic,
+                _doorState,
+                &_lastPublishedDoorState,
+                true
+            );
+
+            if (gatesPublished && doorPublished) {
+                _forceStateRepublish = false;
+            }
+        } else if (connected) {
+            publishState(_gatesStateTopic, _gatesState, &_lastPublishedGatesState);
+            publishState(_doorStateTopic, _doorState, &_lastPublishedDoorState);
+        }
 
         _lastStatePublishTime = esp_timer_get_time();
     }
@@ -228,15 +327,23 @@ bool Gates::isGatesOpen()
     return state.second && state.first;
 }
 
-void Gates::publishState(const std::string& topic, GatesState state, GatesState* lastPublishedState)
+bool Gates::publishState(
+    const std::string& topic,
+    GatesState state,
+    GatesState* lastPublishedState,
+    bool force
+)
 {
-    if (state == *lastPublishedState) {
-        return;
+    if (!force && state == *lastPublishedState) {
+        return true;
     }
 
     if (_mqtt->publish(topic.c_str(), statePayload(state), false)) {
         *lastPublishedState = state;
+        return true;
     }
+
+    return false;
 }
 
 const char* Gates::statePayload(GatesState state)

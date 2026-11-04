@@ -75,9 +75,9 @@ MR6C channel map: 1 = lawn watering, 4 = decorative light, 5 = parking light, 6 
 
 Each successful `persistConfig()` stores EEPROM and refreshes the `/config.bin` export mirror on LittleFS; the mirror is not the source of truth and a mirror write failure does not fail the save.
 
-State flow: there is no aggregate `State` any more. Each EDCommon relay/sensor/binary sensor serializes and publishes its own topic; covers are published by `Gates` directly through `EDMQTT::MQTT::publish(topic, payload, false)` on change at most every 500 ms. The gates open sensor is read by `Gates` via `isActive()`; an invalid reading is treated as closed until the first successful MR6C read.
+State flow: there is no aggregate `State` any more. Each EDCommon relay/sensor/binary sensor serializes and publishes its own topic; covers are published by `Gates` directly through `EDMQTT::MQTT::publish(topic, payload, false)` on change at most every 500 ms and republished on every MQTT (re)connect edge. After 2 minutes without motion, `Gates` resyncs stuck cover states from the gate-open limit sensor. The gates open sensor is read by `Gates` via `isActive()`; an invalid reading is treated as closed until the first successful MR6C read.
 
-Command flow: each controllable entity subscribes its own `.../set` topic. `GatesCommandHandler` (one instance per cover) maps plain `open`/`close`/`stop` payloads and dispatches to `Gates::gatesChange()` / `Gates::doorChange()`; EDCommon relay consumers map plain `on`/`off`. All command consumers reject retained messages.
+Command flow: each controllable entity subscribes its own `.../set` topic. `GatesCommandHandler` (one instance per cover) maps plain `open`/`close`/`stop` payloads and dispatches to `Gates::gatesChange()` / `Gates::doorChange()`; cover commands are logged with an accept or reject reason; EDCommon relay consumers map plain `on`/`off`. All command consumers reject retained messages.
 
 Timing: all periodic work is non-blocking and scheduled with `esp_timer_get_time()` in microseconds. Do not add blocking `delay()` to `loop()` or module updates.
 
@@ -166,7 +166,7 @@ The gates-open state is absent until the first valid MR6C reading. Command topic
 | Parking space light | `{prefix}/parking_space_light/set` | `on`, `off` |
 | Street light | `{prefix}/street_light/set` | `on`, `off` |
 
-All command consumers reject retained messages. Cover state is published on change at most every 500 ms; EDCommon relays publish state on change and refresh it every 60 s; sensors and the binary sensor publish on change and refresh every 60 s. Discovery configs are published retained.
+All command consumers reject retained messages. Cover state is published on change at most every 500 ms, republished on MQTT (re)connect edges and resynced from the gate-open limit after a 2 min motion timeout; EDCommon relays publish state on change and refresh it every 60 s; sensors and the binary sensor publish on change and refresh every 60 s. Discovery configs are published retained.
 
 HA discovery entities:
 

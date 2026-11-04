@@ -62,7 +62,7 @@ private:
     bool isMotorClosing();
     bool isGatesOpen();
 
-    void publishState(const std::string& topic, GatesState state, GatesState* lastPublishedState);
+    bool publishState(const std::string& topic, GatesState state, GatesState* lastPublishedState, bool force = false);
     static const char* statePayload(GatesState state);
 
 private:
@@ -83,6 +83,9 @@ private:
     GatesState _lastPublishedDoorState = GATES_STATE_CLOSED;
     uint64_t _lastStatePublishTime = 0;
     uint64_t _lastMotorUpdateTime = 0;
+    uint64_t _lastMotionTimeUs = 0;
+    bool _mqttWasConnected = false;
+    bool _forceStateRepublish = true;
     bool _isMotorOpening = false;
     bool _isMotorClosing = false;
     int8_t _openMeasurements = 0;
