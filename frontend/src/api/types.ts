@@ -13,6 +13,8 @@ export interface DeviceStatus {
   freeHeap: number;
   uptime: number;
   lastResetReason: string;
+  /** Git-derived firmware stamp; absent from pre-version firmware. */
+  fwVersion?: string;
 }
 
 /** GET /healthcheck/healty (misspelled intentionally by the firmware lib). */

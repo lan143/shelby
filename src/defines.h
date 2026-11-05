@@ -20,8 +20,12 @@
 #define RS485RX  35
 #define RS485TX  32
 
+#ifndef SHELBY_FW_VERSION
+#define SHELBY_FW_VERSION "unknown"
+#endif
+
 const char deviceName[] = "Shelby";
 const char deviceModel[] = "KC868-A2";
 const char deviceManufacturer[] = "Kincony";
 const char deviceHWVersion[] = "1.0.0";
-const char deviceFWVersion[] = "0.1.0";
+const char deviceFWVersion[] = SHELBY_FW_VERSION;

@@ -1,7 +1,33 @@
+import { execSync } from 'node:child_process';
 import { defineConfig, loadEnv } from 'vite';
 import preact from '@preact/preset-vite';
 
 const frontendRoot = new URL('./', import.meta.url).pathname;
+
+// Mirrors scripts/platformio_version.py: short HEAD sha, optional nearest tag
+// prefix and a -dirty suffix when the working tree has uncommitted changes.
+function resolveGitVersion(): string {
+  const run = (args: string): string => {
+    try {
+      return execSync(`git ${args}`, {
+        cwd: frontendRoot,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      }).trim();
+    } catch {
+      return '';
+    }
+  };
+
+  const hash = run('rev-parse --short HEAD');
+  if (!hash) {
+    return 'unknown';
+  }
+
+  const dirty = run('status --porcelain') ? '-dirty' : '';
+  const tag = run('describe --tags --abbrev=0');
+  return tag ? `${tag}-${hash}${dirty}` : `${hash}${dirty}`;
+}
 
 // The Shelby firmware serves data/ verbatim from LittleFS at the device root
 // (`serveStatic("/", LittleFS, "/").setDefaultFile("index.html")`), so the
@@ -36,6 +62,9 @@ export default defineConfig(({ command, mode }) => {
 
   return {
     base: './',
+    define: {
+      __UI_VERSION__: JSON.stringify(resolveGitVersion()),
+    },
     plugins: [preact()],
     ...(server ? { server } : {}),
     build: {

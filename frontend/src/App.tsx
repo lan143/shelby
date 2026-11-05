@@ -1,4 +1,5 @@
-import { useState } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
+import { getStatus } from './api/client';
 import { TabBar, type TabItem } from './components/TabBar';
 import { BackupPanel } from './pages/Backup';
 import { DevicesPage } from './pages/Devices';
@@ -43,6 +44,21 @@ function renderPanel(tab: TabId) {
 
 export function App() {
   const [tab, setTab] = useState<TabId>('status');
+  const [fwVersion, setFwVersion] = useState<string | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+
+    void getStatus().then((result) => {
+      if (mounted && result.ok && result.data.fwVersion) {
+        setFwVersion(result.data.fwVersion);
+      }
+    });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   return (
     <>
@@ -50,7 +66,11 @@ export function App() {
         <div class="brand">
           <h1>Shelby</h1>
         </div>
-        <span class="hint">KC868-A2 controller</span>
+        <div class="versions">
+          <span class="hint">KC868-A2 controller</span>
+          <span class="hint version">FW {fwVersion ?? '\u2014'}</span>
+          <span class="hint version">UI {__UI_VERSION__}</span>
+        </div>
       </header>
       <TabBar tabs={TABS} active={tab} onSelect={setTab} />
       <main

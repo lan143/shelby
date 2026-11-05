@@ -547,6 +547,8 @@ void Handler::init()
                     entity[F("lastResetReason")] = "Unknown";
                     break;
             }
+
+            entity[F("fwVersion")] = deviceFWVersion;
         });
         response->print(data.c_str());
         request->send(response);

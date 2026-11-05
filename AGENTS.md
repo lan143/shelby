@@ -56,7 +56,7 @@ Build flags: `-Wshadow`, `-DCORE_DEBUG_LEVEL=5`, `-DCONFIG_LOG_COLORS=1`. `board
 | Ethernet PHY | LAN8720 | `ETH_ADDR=0`, power pin `-1`, MDC 23, MDIO 18, clock `ETH_CLOCK_GPIO17_OUT` |
 | Config EEPROM | 1500 bytes | `EEPROM_SIZE` |
 
-The KC868-A2 has a built-in RJ45 Ethernet port. The board identity is: name `Shelby`, model `KC868-A2`, manufacturer `Kincony`, HW `1.0.0`, FW `0.1.0`.
+The KC868-A2 has a built-in RJ45 Ethernet port. The board identity is: name `Shelby`, model `KC868-A2`, manufacturer `Kincony`, HW `1.0.0`; the FW version is a git-derived build stamp injected by `scripts/platformio_version.py` (fallback `unknown`), e.g. `v1.2.0-25ee9b3-dirty`.
 
 ### RS485 devices
 
@@ -94,7 +94,7 @@ The SPA in `frontend/` is the reference client; the firmware handlers live in `s
 | `GET`, `POST` | `/api/settings/modbus` | Modbus speed and the two RS485 addresses |
 | `GET`, `POST` | `/api/settings` | Septic tank diameter only (the old credential dump was removed) |
 | `GET`, `POST` | `/api/settings/mqtt` | Broker, discovery and topic-prefix settings; GET still returns the MQTT password |
-| `GET` | `/api/status` | Wi-Fi state, heap, uptime and last reset reason |
+| `GET` | `/api/status` | Wi-Fi state, heap, uptime, last reset reason and git-derived firmware version |
 | `POST` | `/api/reboot` | Answer `{}`, then restart the device |
 | `GET` | `/healthcheck/healty` | `{healty:true}` — misspelling is intentional |
 | `GET` | `/healthcheck/ready` | `{ready,message}`; HTTP 500 while not ready |
@@ -133,7 +133,7 @@ Settings POST bodies must carry every key, even when only one value changed:
 
 `GET /api/settings/modbus` returns `modbusSpeed`, `addressMR6C`, `addressQDY30A`. `GET /api/settings` returns only `septicDiameter`. `GET /api/settings/mqtt` returns the seven POST keys including the plaintext `password`. `POST /api/settings/modbus` applies a speed change live but addresses only take effect after reboot; post-MQTT and septic-diameter changes also require a reboot.
 
-`GET /api/status` returns `wifiStatus` (`connected`/`disconnected`), `freeHeap`, `uptime` (seconds) and `lastResetReason`.
+`GET /api/status` returns `wifiStatus` (`connected`/`disconnected`), `freeHeap`, `uptime` (seconds), `lastResetReason` and `fwVersion` (git-derived build stamp, e.g. `v1.2.0-25ee9b3-dirty` or a short hash; `unknown` without git).
 
 Restore flow: `POST /api/config/backup` and `POST /api/config` write `/config.bin`, create `/config.restore.pending` and reboot. At the next boot `src/main.cpp` validates the file (size, `CURRENT_VERSION`, CRC16) and copies it into EEPROM before `configMgr.load()`; any failure keeps the existing EEPROM config. ESPAsyncWebServer matches plain-URI routes BackwardCompatible (exact match OR prefix + `/`, so `/api/settings` also swallows `/api/settings/mqtt`), and the first registered handler wins; therefore registration order must be: static, healthcheck, NetworkApi, `/api/config/backup`, `/api/config`, `/api/settings/modbus`, `/api/settings/mqtt`, bare `/api/settings`, `/api/devices` GET, `/api/devices/set` POST, `/api/status`, `/api/reboot` — register the `/api/config/backup` route **before** `/api/config` and every `/api/settings/<sub>` route **before** bare `/api/settings`, or the shorter path shadows the longer handler.
 
