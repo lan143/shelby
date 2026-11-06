@@ -5,6 +5,8 @@
 #include "gates.h"
 
 static constexpr uint64_t GATES_MOTION_RESYNC_TIMEOUT_US = 120000000ULL;
+static constexpr uint64_t GATES_MOTION_HARD_RESYNC_US = 300000000ULL;
+static constexpr uint64_t GATES_STATE_REFRESH_US = 60000000ULL;
 
 static const char* commandPayload(GatesCommand command)
 {
@@ -196,9 +198,22 @@ void Gates::loop()
 
         _lastMotorUpdateTime = esp_timer_get_time();
 
-        if (!isMotorOpening() && !isMotorClosing()
-            && (esp_timer_get_time() - _lastMotionTimeUs) >= GATES_MOTION_RESYNC_TIMEOUT_US) {
+        uint64_t now = esp_timer_get_time();
+
+        bool motionTimeoutReached = !isMotorOpening() && !isMotorClosing()
+            && (now - _lastMotionTimeUs) >= GATES_MOTION_RESYNC_TIMEOUT_US;
+        bool gatesHardCapReached = (_gatesState == GATES_STATE_OPENING || _gatesState == GATES_STATE_CLOSING)
+            && _gatesMidMotionSinceUs != 0
+            && (now - _gatesMidMotionSinceUs) >= GATES_MOTION_HARD_RESYNC_US;
+        bool doorHardCapReached = (_doorState == GATES_STATE_OPENING || _doorState == GATES_STATE_CLOSING)
+            && _doorMidMotionSinceUs != 0
+            && (now - _doorMidMotionSinceUs) >= GATES_MOTION_HARD_RESYNC_US;
+
+        if (motionTimeoutReached || gatesHardCapReached || doorHardCapReached) {
             bool gatesOpen = isGatesOpen();
+            const char* resyncReason = (gatesHardCapReached || doorHardCapReached)
+                ? "hard cap"
+                : "motion timeout";
 
             GatesState gatesResolved = _gatesState;
             if (_gatesState == GATES_STATE_OPENING || _gatesState == GATES_STATE_CLOSING) {
@@ -210,9 +225,10 @@ void Gates::loop()
             if (gatesResolved != _gatesState) {
                 LOGW(
                     "gates",
-                    "gates state resynced: %s -> %s (motion timeout)",
+                    "gates state resynced: %s -> %s (%s)",
                     statePayload(_gatesState),
-                    statePayload(gatesResolved)
+                    statePayload(gatesResolved),
+                    resyncReason
                 );
                 gatesStateUpdate(gatesResolved);
             }
@@ -227,9 +243,10 @@ void Gates::loop()
             if (doorResolved != _doorState) {
                 LOGW(
                     "gates",
-                    "door state resynced: %s -> %s (motion timeout)",
+                    "door state resynced: %s -> %s (%s)",
                     statePayload(_doorState),
-                    statePayload(doorResolved)
+                    statePayload(doorResolved),
+                    resyncReason
                 );
                 doorStateUpdate(doorResolved);
             }
@@ -246,19 +263,23 @@ void Gates::loop()
         _lastUpdateMeasurementsTime = esp_timer_get_time();
     }
 
+    bool connected = _mqtt->isConnected();
+
+    if (connected != _mqttWasConnected) {
+        _forceStateRepublish = true;
+        _mqttWasConnected = connected;
+    }
+
     // Same cadence and change-only semantics the aggregate StateMgr provided,
     // but each cover publishes its own non-retained payload independently.
     if ((_lastStatePublishTime + 500000) < esp_timer_get_time()) { // every 0.5 second
-        bool connected = _mqtt->isConnected();
+        uint64_t now = esp_timer_get_time();
+        bool periodicRefreshDue = connected
+            && (now - _lastForcedRepublishUs) >= GATES_STATE_REFRESH_US;
 
-        if (connected != _mqttWasConnected) {
-            _forceStateRepublish = true;
-            _mqttWasConnected = connected;
-        }
-
-        if (connected && _forceStateRepublish) {
-            // MQTT has (re)connected: publish both covers even when unchanged,
-            // and keep trying until both publishes succeed.
+        if (connected && (_forceStateRepublish || periodicRefreshDue)) {
+            // MQTT has (re)connected or the periodic refresh is due: publish both
+            // covers even when unchanged, and keep trying until both publishes succeed.
             bool gatesPublished = publishState(
                 _gatesStateTopic,
                 _gatesState,
@@ -274,6 +295,7 @@ void Gates::loop()
 
             if (gatesPublished && doorPublished) {
                 _forceStateRepublish = false;
+                _lastForcedRepublishUs = esp_timer_get_time();
             }
         } else if (connected) {
             publishState(_gatesStateTopic, _gatesState, &_lastPublishedGatesState);
@@ -286,11 +308,27 @@ void Gates::loop()
 
 void Gates::gatesStateUpdate(GatesState newState)
 {
+    if (newState == GATES_STATE_OPENING || newState == GATES_STATE_CLOSING) {
+        if (newState != _gatesState) {
+            _gatesMidMotionSinceUs = esp_timer_get_time();
+        }
+    } else {
+        _gatesMidMotionSinceUs = 0;
+    }
+
     _gatesState = newState;
 }
 
 void Gates::doorStateUpdate(GatesState newState)
 {
+    if (newState == GATES_STATE_OPENING || newState == GATES_STATE_CLOSING) {
+        if (newState != _doorState) {
+            _doorMidMotionSinceUs = esp_timer_get_time();
+        }
+    } else {
+        _doorMidMotionSinceUs = 0;
+    }
+
     _doorState = newState;
 }
 

@@ -82,8 +82,11 @@ private:
     GatesState _lastPublishedGatesState = GATES_STATE_CLOSED;
     GatesState _lastPublishedDoorState = GATES_STATE_CLOSED;
     uint64_t _lastStatePublishTime = 0;
+    uint64_t _lastForcedRepublishUs = 0;
     uint64_t _lastMotorUpdateTime = 0;
     uint64_t _lastMotionTimeUs = 0;
+    uint64_t _gatesMidMotionSinceUs = 0;
+    uint64_t _doorMidMotionSinceUs = 0;
     bool _mqttWasConnected = false;
     bool _forceStateRepublish = true;
     bool _isMotorOpening = false;
