@@ -7,6 +7,7 @@
 static constexpr uint64_t GATES_MOTION_RESYNC_TIMEOUT_US = 120000000ULL;
 static constexpr uint64_t GATES_MOTION_HARD_RESYNC_US = 300000000ULL;
 static constexpr uint64_t GATES_STATE_REFRESH_US = 60000000ULL;
+static constexpr uint64_t GATES_TRAVEL_END_GRACE_US = 3000000ULL;
 
 static const char* commandPayload(GatesCommand command)
 {
@@ -87,6 +88,7 @@ void Gates::gatesChange(GatesCommand command)
 
     LOGI("gates", "accepted gates %s", commandPayload(command));
 
+    _openMode = GATES_OPEN_MODE_GATE;
     _state = GATES_RELAY_STATE_GATE_ON;
 
     switch (command) {
@@ -121,6 +123,7 @@ void Gates::doorChange(GatesCommand command)
 
     LOGI("gates", "accepted door %s", commandPayload(command));
 
+    _openMode = GATES_OPEN_MODE_DOOR;
     _state = GATES_RELAY_STATE_DOOR_ON;
 
     switch (command) {
@@ -166,30 +169,65 @@ void Gates::loop()
             if (_gatesState == GATES_STATE_CLOSED
                 && _doorState == GATES_STATE_CLOSED) {
                     gatesStateUpdate(GATES_STATE_OPENING);
+                    _openMode = GATES_OPEN_MODE_GATE;
+            }
+
+            // Keep the latch in step with the cover that is actually moving.
+            if (_doorState == GATES_STATE_OPENING) {
+                _openMode = GATES_OPEN_MODE_DOOR;
+            } else if (_gatesState == GATES_STATE_OPENING) {
+                _openMode = GATES_OPEN_MODE_GATE;
             }
 
             _isMotorOpening = true;
-        } else if (_isMotorOpening && isGatesOpen()) {
-            if (_gatesState == GATES_STATE_OPENING) {
-                gatesStateUpdate(GATES_STATE_OPENED);
-            } else if (_doorState == GATES_STATE_OPENING) {
-                doorStateUpdate(GATES_STATE_OPENED);
+            _openTravelEndSinceUs = 0;
+        } else if (_isMotorOpening) {
+            if (_openTravelEndSinceUs == 0) {
+                _openTravelEndSinceUs = esp_timer_get_time();
             }
 
-            _isMotorOpening = false;
+            if (isGatesOpen()) {
+                if (_gatesState == GATES_STATE_OPENING) {
+                    gatesStateUpdate(GATES_STATE_OPENED);
+                } else if (_doorState == GATES_STATE_OPENING) {
+                    doorStateUpdate(GATES_STATE_OPENED);
+                }
+
+                _isMotorOpening = false;
+                _openTravelEndSinceUs = 0;
+            } else if ((esp_timer_get_time() - _openTravelEndSinceUs) >= GATES_TRAVEL_END_GRACE_US) {
+                _isMotorOpening = false;
+                _openTravelEndSinceUs = 0;
+            }
         } else if (isMotorClosing()) {
-            if (_gatesState == GATES_STATE_OPENED) {
+            if (_openMode == GATES_OPEN_MODE_DOOR && _doorState == GATES_STATE_OPENED) {
+                doorStateUpdate(GATES_STATE_CLOSING);
+            } else if (_openMode == GATES_OPEN_MODE_GATE && _gatesState == GATES_STATE_OPENED) {
+                gatesStateUpdate(GATES_STATE_CLOSING);
+            } else if (_gatesState == GATES_STATE_OPENED) {
                 gatesStateUpdate(GATES_STATE_CLOSING);
             } else if (_doorState == GATES_STATE_OPENED) {
                 doorStateUpdate(GATES_STATE_CLOSING);
             }
 
             _isMotorClosing = true;
-        } else if (_isMotorClosing && !isGatesOpen()) {
-            gatesStateUpdate(GATES_STATE_CLOSED);
-            doorStateUpdate(GATES_STATE_CLOSED);
+            _closeTravelEndSinceUs = 0;
+        } else if (_isMotorClosing) {
+            if (_closeTravelEndSinceUs == 0) {
+                _closeTravelEndSinceUs = esp_timer_get_time();
+            }
 
-            _isMotorClosing = false;
+            if (!isGatesOpen()) {
+                gatesStateUpdate(GATES_STATE_CLOSED);
+                doorStateUpdate(GATES_STATE_CLOSED);
+                _openMode = GATES_OPEN_MODE_NONE;
+
+                _isMotorClosing = false;
+                _closeTravelEndSinceUs = 0;
+            } else if ((esp_timer_get_time() - _closeTravelEndSinceUs) >= GATES_TRAVEL_END_GRACE_US) {
+                _isMotorClosing = false;
+                _closeTravelEndSinceUs = 0;
+            }
         }
 
         if (isMotorOpening() || isMotorClosing()) {
@@ -209,46 +247,57 @@ void Gates::loop()
             && _doorMidMotionSinceUs != 0
             && (now - _doorMidMotionSinceUs) >= GATES_MOTION_HARD_RESYNC_US;
 
-        if (motionTimeoutReached || gatesHardCapReached || doorHardCapReached) {
+        bool gatesEligible = motionTimeoutReached || gatesHardCapReached;
+        bool doorEligible = motionTimeoutReached || doorHardCapReached;
+
+        if (gatesEligible || doorEligible) {
             bool gatesOpen = isGatesOpen();
             const char* resyncReason = (gatesHardCapReached || doorHardCapReached)
                 ? "hard cap"
                 : "motion timeout";
 
-            GatesState gatesResolved = _gatesState;
-            if (_gatesState == GATES_STATE_OPENING || _gatesState == GATES_STATE_CLOSING) {
-                gatesResolved = gatesOpen ? GATES_STATE_OPENED : GATES_STATE_CLOSED;
-            } else if (_gatesState == GATES_STATE_OPENED && !gatesOpen) {
-                gatesResolved = GATES_STATE_CLOSED;
+            if (gatesEligible) {
+                GatesState gatesResolved = _gatesState;
+                if (_gatesState == GATES_STATE_OPENING || _gatesState == GATES_STATE_CLOSING) {
+                    gatesResolved = gatesOpen ? GATES_STATE_OPENED : GATES_STATE_CLOSED;
+                } else if (_gatesState == GATES_STATE_OPENED && !gatesOpen) {
+                    gatesResolved = GATES_STATE_CLOSED;
+                }
+
+                if (gatesResolved != _gatesState) {
+                    LOGW(
+                        "gates",
+                        "gates state resynced: %s -> %s (%s)",
+                        statePayload(_gatesState),
+                        statePayload(gatesResolved),
+                        resyncReason
+                    );
+                    gatesStateUpdate(gatesResolved);
+                }
             }
 
-            if (gatesResolved != _gatesState) {
-                LOGW(
-                    "gates",
-                    "gates state resynced: %s -> %s (%s)",
-                    statePayload(_gatesState),
-                    statePayload(gatesResolved),
-                    resyncReason
-                );
-                gatesStateUpdate(gatesResolved);
+            if (doorEligible) {
+                GatesState doorResolved = _doorState;
+                if (_doorState == GATES_STATE_OPENING || _doorState == GATES_STATE_CLOSING) {
+                    doorResolved = gatesOpen ? GATES_STATE_OPENED : GATES_STATE_CLOSED;
+                } else if (_doorState == GATES_STATE_OPENED && !gatesOpen) {
+                    doorResolved = GATES_STATE_CLOSED;
+                }
+
+                if (doorResolved != _doorState) {
+                    LOGW(
+                        "gates",
+                        "door state resynced: %s -> %s (%s)",
+                        statePayload(_doorState),
+                        statePayload(doorResolved),
+                        resyncReason
+                    );
+                    doorStateUpdate(doorResolved);
+                }
             }
 
-            GatesState doorResolved = _doorState;
-            if (_doorState == GATES_STATE_OPENING || _doorState == GATES_STATE_CLOSING) {
-                doorResolved = gatesOpen ? GATES_STATE_OPENED : GATES_STATE_CLOSED;
-            } else if (_doorState == GATES_STATE_OPENED && !gatesOpen) {
-                doorResolved = GATES_STATE_CLOSED;
-            }
-
-            if (doorResolved != _doorState) {
-                LOGW(
-                    "gates",
-                    "door state resynced: %s -> %s (%s)",
-                    statePayload(_doorState),
-                    statePayload(doorResolved),
-                    resyncReason
-                );
-                doorStateUpdate(doorResolved);
+            if (_gatesState == GATES_STATE_CLOSED && _doorState == GATES_STATE_CLOSED) {
+                _openMode = GATES_OPEN_MODE_NONE;
             }
         }
     }

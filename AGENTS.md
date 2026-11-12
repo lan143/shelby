@@ -194,6 +194,7 @@ The covers keep their legacy unique IDs so Home Assistant reuses the existing en
 - Native gate/door relays are momentary pulses: ON, then OFF after 0.2 s (200000 µs).
 - End signals are sampled every 1 ms into counters constrained to 0..50; motor movement is detected above 25.
 - Motor transitions are evaluated every 0.5 s; opening while both are closed enters `OPENING`, end of opening with `isGatesOpen` enters `OPENED`, closing from `OPENED` enters `CLOSING`, end of motion sets both `CLOSED`.
+- The open mode is remembered: `_openMode` (gate/door) is latched on an accepted command, or default-attributed to gates when uncommanded opening motion is seen, and cleared only at end-of-closing. The magnetic reed is mode-agnostic, so a door-mode traversal must never resolve gates to open; uncommanded (remote/intercom) openings are attributed to gates by design.
 - The gate-end signals are `GATE_OPEN`/`GATE_CLOSE`; the open sensor is MR6C input 1, now owned by `EDCommon::BinarySensor::WBMR6C` (FREQUENCY mode, `reverse=true`). There is no relay-module init-order dependency any more.
 - Lawn watering turns off automatically after 20 minutes (`1200000000` µs) through EDCommon's `Relay::withTimeout()`. Relays 4, 5 and 6 are fire-and-forget.
 - QDY-30A is polled every 60 s; readings above 3.5 m are rejected; speeds are only calculated below 2.8 m; speeds use 10-sample ring buffers and reset to 0 after 5 minutes without updates; the sensor is "not ready" after 10 minutes without a valid reading.

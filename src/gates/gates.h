@@ -23,6 +23,13 @@ enum GatesCommand : int
     GATES_COMMAND_STOP
 };
 
+enum GatesOpenMode : int
+{
+    GATES_OPEN_MODE_NONE,
+    GATES_OPEN_MODE_GATE,
+    GATES_OPEN_MODE_DOOR
+};
+
 class Gates
 {
 public:
@@ -79,6 +86,7 @@ private:
 
     GatesState _gatesState = GATES_STATE_CLOSED;
     GatesState _doorState = GATES_STATE_CLOSED;
+    GatesOpenMode _openMode = GATES_OPEN_MODE_NONE;
     GatesState _lastPublishedGatesState = GATES_STATE_CLOSED;
     GatesState _lastPublishedDoorState = GATES_STATE_CLOSED;
     uint64_t _lastStatePublishTime = 0;
@@ -87,6 +95,8 @@ private:
     uint64_t _lastMotionTimeUs = 0;
     uint64_t _gatesMidMotionSinceUs = 0;
     uint64_t _doorMidMotionSinceUs = 0;
+    uint64_t _openTravelEndSinceUs = 0;
+    uint64_t _closeTravelEndSinceUs = 0;
     bool _mqttWasConnected = false;
     bool _forceStateRepublish = true;
     bool _isMotorOpening = false;
